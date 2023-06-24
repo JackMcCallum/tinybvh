@@ -81,20 +81,64 @@ public:
 
    void Update()
    {
+      if (!ImGui::GetIO().WantCaptureMouse)
+      {
+         if (ImGui::GetIO().MouseDown[ImGuiMouseButton_Right])
+         {
+            mCameraPitch -= ImGui::GetIO().MouseDelta.y * 0.1f;
+            mCameraYaw += ImGui::GetIO().MouseDelta.x * 0.1f;
 
+            float speed = 0.1f;
+
+            DirectX::XMMATRIX cameraRot = DirectX::XMMatrixRotationRollPitchYaw(
+               DirectX::XMConvertToRadians(mCameraPitch),
+               DirectX::XMConvertToRadians(mCameraYaw),
+               DirectX::XMConvertToRadians(0.0f));
+
+            if (ImGui::GetIO().KeysDown[ImGuiKey_W])
+            {
+               mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(0, 0, -speed, 0).m, cameraRot));
+            }
+
+            if (ImGui::GetIO().KeysDown[ImGuiKey_S])
+            {
+               mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(0, 0, speed, 0).m, cameraRot));
+            }
+
+            if (ImGui::GetIO().KeysDown[ImGuiKey_A])
+            {
+               mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(speed, 0, 0, 0).m, cameraRot));
+            }
+
+            if (ImGui::GetIO().KeysDown[ImGuiKey_D])
+            {
+               mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(-speed, 0, 0, 0).m, cameraRot));
+            }
+
+            if (ImGui::GetIO().KeysDown[ImGuiKey_Q])
+            {
+               mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(0, speed, 0, 0).m, cameraRot));
+            }
+
+            if (ImGui::GetIO().KeysDown[ImGuiKey_E])
+            {
+               mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(0, -speed, 0, 0).m, cameraRot));
+            }
+         }
+      }
    }
 
    CameraMatrices ComputeMatrices(float fovDegrees, float aspect, float nearPlane, float farPlane)
    {
-      CameraMatrices out;
-
       DirectX::XMMATRIX cameraRot = DirectX::XMMatrixRotationRollPitchYaw(
          DirectX::XMConvertToRadians(mCameraPitch),
          DirectX::XMConvertToRadians(mCameraYaw),
          DirectX::XMConvertToRadians(0.0f));
 
-      DirectX::XMMATRIX cameraPos = DirectX::XMMatrixTranslation(mCameraPosX, mCameraPosY, mCameraPosZ);
+      auto pos = mCameraPos.SplitComponents();
+      DirectX::XMMATRIX cameraPos = DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
 
+      CameraMatrices out;
       out.cameraMatrix = DirectX::XMMatrixMultiply(cameraRot, cameraPos);
       out.viewMatrix = DirectX::XMMatrixInverse(nullptr, out.cameraMatrix);
       out.projMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fovDegrees), aspect, nearPlane, farPlane);
@@ -103,10 +147,7 @@ public:
       return out;
    }
 
-   float mCameraPosX = 10;
-   float mCameraPosY = 10;
-   float mCameraPosZ = 10;
-
+   math::Float4 mCameraPos = math::Float4(10, 10, 10, 1);
    float mCameraPitch = -45;
    float mCameraYaw = 45;
 };
@@ -126,7 +167,7 @@ void BVH_OnTick()
 
    gFreeCamera.Update();
 
-   CameraMatrices cameraMatrices = gFreeCamera.ComputeMatrices(75.0f, 1.666f, 0.1, 10.0f);
+   CameraMatrices cameraMatrices = gFreeCamera.ComputeMatrices(60.0f, 1.666f, 0.1, 10.0f);
 
    auto imguiDrawLine3D = [&cameraMatrices](math::Float4 a, math::Float4 b, ImU32 col)
    {
