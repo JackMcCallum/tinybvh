@@ -48,6 +48,71 @@ math::Matrix4 QueryViewMatrix;
 
 bvh::BVH3D<MyUser, unsigned int> sBVHTest(BVHCount);
 
+struct CameraMatrices
+{
+   // The matrix of the camera
+   // AKA the matrix you would use to draw an object in worldspace where the camera is positioned
+   DirectX::XMMATRIX cameraMatrix;
+
+   // The view matrix, inverse of the camera matrix
+   DirectX::XMMATRIX viewMatrix;
+
+   // The projection matrix
+   DirectX::XMMATRIX projMatrix;
+
+   // Premultiplied matrices
+   DirectX::XMMATRIX projViewMatrix;
+   DirectX::XMMATRIX invProjViewMatrix;
+};
+
+class FreeCamera
+{
+public:
+   FreeCamera()
+   {
+      
+   }
+
+   ~FreeCamera()
+   {
+
+   }
+
+
+   void Update()
+   {
+
+   }
+
+   CameraMatrices ComputeMatrices(float fovDegrees, float aspect, float nearPlane, float farPlane)
+   {
+      CameraMatrices out;
+
+      DirectX::XMMATRIX cameraRot = DirectX::XMMatrixRotationRollPitchYaw(
+         DirectX::XMConvertToRadians(mCameraPitch),
+         DirectX::XMConvertToRadians(mCameraYaw),
+         DirectX::XMConvertToRadians(0.0f));
+
+      DirectX::XMMATRIX cameraPos = DirectX::XMMatrixTranslation(mCameraPosX, mCameraPosY, mCameraPosZ);
+
+      out.cameraMatrix = DirectX::XMMatrixMultiply(cameraRot, cameraPos);
+      out.viewMatrix = DirectX::XMMatrixInverse(nullptr, out.cameraMatrix);
+      out.projMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fovDegrees), aspect, nearPlane, farPlane);
+      out.projViewMatrix = DirectX::XMMatrixMultiply(out.viewMatrix, out.projMatrix);
+      out.invProjViewMatrix = DirectX::XMMatrixInverse(nullptr, out.projViewMatrix);
+      return out;
+   }
+
+   float mCameraPosX = 10;
+   float mCameraPosY = 10;
+   float mCameraPosZ = 10;
+
+   float mCameraPitch = -45;
+   float mCameraYaw = 45;
+};
+
+FreeCamera gFreeCamera;
+
 void BVH_OnTick()
 {
    class BVHDrawInterface : public bvh::DrawInterface
@@ -58,6 +123,47 @@ void BVH_OnTick()
          gDebugLines->AddAABB(bounds.min, bounds.max, 0xFFFFFFFF);
       }
    };
+
+   gFreeCamera.Update();
+
+   CameraMatrices cameraMatrices = gFreeCamera.ComputeMatrices(75.0f, 1.666f, 0.1, 10.0f);
+
+   auto imguiDrawLine3D = [&cameraMatrices](math::Float4 a, math::Float4 b, ImU32 col)
+   {
+      ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+
+      math::Float4 at = DirectX::XMVector4Transform(a.m, cameraMatrices.projViewMatrix);
+      math::Float4 bt = DirectX::XMVector4Transform(b.m, cameraMatrices.projViewMatrix);
+
+      // Perspective divide, then scale from (-1 to 1) -> (0 to 1)
+      at = at.Div(at.Shuffle<3>()).Mul(0.5f).Add(0.5f);
+      bt = bt.Div(bt.Shuffle<3>()).Mul(0.5f).Add(0.5f);
+
+      math::Float4 displaySize(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y, 1, 1);
+
+      auto ac = at.Mul(displaySize).SplitComponents();
+      auto bc = bt.Mul(displaySize).SplitComponents();
+
+      drawList->AddLine(ImVec2(ac.x, ac.y), ImVec2(bc.x, bc.y), col);
+   };
+
+   ImU32 gridCol = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1));
+
+   for (int i = -10; i <= 10; i++)
+   {
+      if (i == 0)
+      {
+         imguiDrawLine3D(math::Float4(-10, 0, i, 1), math::Float4(10, 0, i, 1), ImGui::GetColorU32(ImVec4(1, 0, 0, 1)));
+         imguiDrawLine3D(math::Float4(i, 0, -10, 1), math::Float4(i, 0, 10, 1), ImGui::GetColorU32(ImVec4(0, 0, 1, 1)));
+      }
+      else
+      {
+         imguiDrawLine3D(math::Float4(-10, 0, i, 1), math::Float4(10, 0, i, 1), gridCol);
+         imguiDrawLine3D(math::Float4(i, 0, -10, 1), math::Float4(i, 0, 10, 1), gridCol);
+      }
+   }
+
+   imguiDrawLine3D(math::Float4(0, 0, 0, 1), math::Float4(0, 1, 0, 1), ImGui::GetColorU32(ImVec4(0, 1, 0, 1)));
 
    if (BVHForceRefresh)
    {
