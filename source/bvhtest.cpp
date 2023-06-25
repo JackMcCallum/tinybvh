@@ -78,22 +78,19 @@ public:
 
    }
 
-
    void Update()
    {
       if (!ImGui::GetIO().WantCaptureMouse)
       {
          if (ImGui::GetIO().MouseDown[ImGuiMouseButton_Right])
          {
+            // Dragging the mouse UP leads to a negative delta, need to look up which is positive pitch so we flip it
             mCameraPitch -= ImGui::GetIO().MouseDelta.y * 0.1f;
             mCameraYaw += ImGui::GetIO().MouseDelta.x * 0.1f;
 
             float speed = 0.1f;
 
-            DirectX::XMMATRIX cameraRot = DirectX::XMMatrixRotationRollPitchYaw(
-               DirectX::XMConvertToRadians(mCameraPitch),
-               DirectX::XMConvertToRadians(mCameraYaw),
-               DirectX::XMConvertToRadians(0.0f));
+            DirectX::XMMATRIX cameraRot = ComputeCameraRotationMatrix();
 
             if (ImGui::GetIO().KeysDown[ImGuiKey_W])
             {
@@ -105,12 +102,12 @@ public:
                mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(0, 0, speed, 0).m, cameraRot));
             }
 
-            if (ImGui::GetIO().KeysDown[ImGuiKey_A])
+            if (ImGui::GetIO().KeysDown[ImGuiKey_D])
             {
                mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(speed, 0, 0, 0).m, cameraRot));
             }
 
-            if (ImGui::GetIO().KeysDown[ImGuiKey_D])
+            if (ImGui::GetIO().KeysDown[ImGuiKey_A])
             {
                mCameraPos.m = DirectX::XMVectorAdd(mCameraPos.m, DirectX::XMVector3Transform(math::Float4(-speed, 0, 0, 0).m, cameraRot));
             }
@@ -128,20 +125,33 @@ public:
       }
    }
 
-   CameraMatrices ComputeMatrices(float fovDegrees, float aspect, float nearPlane, float farPlane)
+   DirectX::XMMATRIX ComputeCameraRotationMatrix()
    {
       DirectX::XMMATRIX cameraRot = DirectX::XMMatrixRotationRollPitchYaw(
          DirectX::XMConvertToRadians(mCameraPitch),
          DirectX::XMConvertToRadians(mCameraYaw),
          DirectX::XMConvertToRadians(0.0f));
 
+      float yaw = DirectX::XMConvertToRadians(mCameraYaw);
+      float pitch = DirectX::XMConvertToRadians(mCameraPitch);
+
+      float x = cos(yaw) * cos(pitch);
+      float y = -sin(pitch); // Negative pitch looks down
+      float z = sin(yaw) * cos(pitch);
+
+      return DirectX::XMMatrixInverse(nullptr, DirectX::XMMatrixLookToLH(math::ZERO.m, math::Float4(x, y, z, 1).m, math::Float4(0, 1, 0, 1).m));
+   }
+
+   CameraMatrices ComputeMatrices(float fovDegrees, float aspect, float nearPlane, float farPlane)
+   {
+
       auto pos = mCameraPos.SplitComponents();
       DirectX::XMMATRIX cameraPos = DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
 
       CameraMatrices out;
-      out.cameraMatrix = DirectX::XMMatrixMultiply(cameraRot, cameraPos);
+      out.cameraMatrix = DirectX::XMMatrixMultiply(ComputeCameraRotationMatrix(), cameraPos);
       out.viewMatrix = DirectX::XMMatrixInverse(nullptr, out.cameraMatrix);
-      out.projMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(fovDegrees), aspect, nearPlane, farPlane);
+      out.projMatrix = DirectX::XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(fovDegrees), aspect, nearPlane, farPlane);
       out.projViewMatrix = DirectX::XMMatrixMultiply(out.viewMatrix, out.projMatrix);
       out.invProjViewMatrix = DirectX::XMMatrixInverse(nullptr, out.projViewMatrix);
       return out;
@@ -176,14 +186,36 @@ void BVH_OnTick()
       math::Float4 at = DirectX::XMVector4Transform(a.m, cameraMatrices.projViewMatrix);
       math::Float4 bt = DirectX::XMVector4Transform(b.m, cameraMatrices.projViewMatrix);
 
+      auto ac = at.SplitComponents();
+      auto bc = bt.SplitComponents();
+
+      // Both behind the camera
+      if (ac.z < 0 && bc.z < 0)
+      {
+         return;
+      }
+
+      if (ac.z < 0)
+      {
+         // ac is behind the camera
+         float s = (bc.z / (ac.z - bc.z)) * -0.999f;
+         at = bt.Add(at.Sub(bt).Mul(s));
+      }
+      else if (bc.z < 0)
+      {
+         // bc is behind the camera
+         float s = (ac.z / (bc.z - ac.z)) * -0.999f;
+         bt = at.Add(bt.Sub(at).Mul(s));
+      }
+
       // Perspective divide, then scale from (-1 to 1) -> (0 to 1)
-      at = at.Div(at.Shuffle<3>()).Mul(0.5f).Add(0.5f);
-      bt = bt.Div(bt.Shuffle<3>()).Mul(0.5f).Add(0.5f);
+      at = at.Div(at.Shuffle<3>()).Mul(math::Float4(0.5f, -0.5f, 0.5f, 1.0f)).Add(0.5f);
+      bt = bt.Div(bt.Shuffle<3>()).Mul(math::Float4(0.5f, -0.5f, 0.5f, 1.0f)).Add(0.5f);
 
       math::Float4 displaySize(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y, 1, 1);
 
-      auto ac = at.Mul(displaySize).SplitComponents();
-      auto bc = bt.Mul(displaySize).SplitComponents();
+      ac = at.Mul(displaySize).SplitComponents();
+      bc = bt.Mul(displaySize).SplitComponents();
 
       drawList->AddLine(ImVec2(ac.x, ac.y), ImVec2(bc.x, bc.y), col);
    };
