@@ -197,6 +197,25 @@ void ImGui_DebugDrawLine_SLOW(const DirectX::XMMATRIX& projViewMatrix, math::Flo
    drawList->AddLine(ImVec2(ac.x, ac.y), ImVec2(bc.x, bc.y), col);
 }
 
+void ImGui_DebugDrawAABB_SLOW(const DirectX::XMMATRIX& projViewMatrix, math::Float4 min, math::Float4 max, ImU32 col)
+{
+   auto smin = min.SplitComponents();
+   auto smax = max.SplitComponents();
+
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smin.x, smin.y, smin.z, 1), math::Float4(smax.x, smin.y, smin.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smax.x, smin.y, smin.z, 1), math::Float4(smax.x, smax.y, smin.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smax.x, smax.y, smin.z, 1), math::Float4(smin.x, smax.y, smin.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smin.x, smax.y, smin.z, 1), math::Float4(smin.x, smin.y, smin.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smin.x, smin.y, smax.z, 1), math::Float4(smax.x, smin.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smax.x, smin.y, smax.z, 1), math::Float4(smax.x, smax.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smax.x, smax.y, smax.z, 1), math::Float4(smin.x, smax.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smin.x, smax.y, smax.z, 1), math::Float4(smin.x, smin.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smin.x, smin.y, smin.z, 1), math::Float4(smin.x, smin.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smax.x, smin.y, smin.z, 1), math::Float4(smax.x, smin.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smax.x, smax.y, smin.z, 1), math::Float4(smax.x, smax.y, smax.z, 1), col);
+   ImGui_DebugDrawLine_SLOW(projViewMatrix, math::Float4(smin.x, smax.y, smin.z, 1), math::Float4(smin.x, smax.y, smax.z, 1), col);
+}
+
 DebugDraw::DebugDraw(ID3D11Device* device, ID3D11DeviceContext* context)
 {
 }

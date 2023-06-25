@@ -20,9 +20,33 @@ void FreeCamera::Update()
          mCameraPitch -= ImGui::GetIO().MouseDelta.y * 0.1f;
          mCameraYaw += ImGui::GetIO().MouseDelta.x * 0.1f;
 
-         float speed = 0.1f;
-
          DirectX::XMMATRIX cameraRot = ComputeCameraRotationMatrix();
+
+         float wheel = ImGui::GetIO().MouseWheel;
+         if (wheel > 0)
+         {
+            while (wheel > 0)
+            {
+               mSpeed *= 1.1f;
+               wheel -= 1;
+            }
+         }
+         else if (wheel < 0)
+         {
+            while (wheel < 0)
+            {
+               mSpeed /= 1.1f;
+               wheel += 1;
+            }
+         }
+
+         float speed = mSpeed;
+
+         // Speed multiplier?
+         if (ImGui::GetIO().KeysDown[ImGuiKey_LeftShift])
+         {
+            speed *= 4;
+         }
 
          if (ImGui::GetIO().KeysDown[ImGuiKey_W])
          {

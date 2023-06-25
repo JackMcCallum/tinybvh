@@ -44,6 +44,7 @@ void DebugDraw_OnInit(ID3D11Device* device, ID3D11DeviceContext* context);
 void DebugDraw_OnShutdown();
 
 void ImGui_DebugDrawLine_SLOW(const DirectX::XMMATRIX& projViewMatrix, math::Float4 a, math::Float4 b, ImU32 col);
+void ImGui_DebugDrawAABB_SLOW(const DirectX::XMMATRIX& projViewMatrix, math::Float4 min, math::Float4 max, ImU32 col);
 
 class DebugDraw
 {
