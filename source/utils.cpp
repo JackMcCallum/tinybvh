@@ -1,7 +1,9 @@
 #pragma once
 #include "utils.h"
 #include "imgui.h"
+#include "camera.h"
 
+#include <DirectXMath.h>
 #include <vector>
 #include <string>
 #include <d3dcompiler.h> // shader compiler
@@ -154,9 +156,49 @@ void DebugDraw_OnShutdown()
    D3D_RELEASE(mDebugLinesPS);
 }
 
+void ImGui_DebugDrawLine_SLOW(const DirectX::XMMATRIX& projViewMatrix, math::Float4 a, math::Float4 b, ImU32 col)
+{
+   ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+
+   math::Float4 at = DirectX::XMVector4Transform(a.m, projViewMatrix);
+   math::Float4 bt = DirectX::XMVector4Transform(b.m, projViewMatrix);
+
+   auto ac = at.SplitComponents();
+   auto bc = bt.SplitComponents();
+
+   // Both behind the camera
+   if (ac.z < 0 && bc.z < 0)
+   {
+      return;
+   }
+
+   if (ac.z < 0)
+   {
+      // ac is behind the camera
+      float s = (bc.z / (ac.z - bc.z)) * -0.999f;
+      at = bt.Add(at.Sub(bt).Mul(s));
+   }
+   else if (bc.z < 0)
+   {
+      // bc is behind the camera
+      float s = (ac.z / (bc.z - ac.z)) * -0.999f;
+      bt = at.Add(bt.Sub(at).Mul(s));
+   }
+
+   // Perspective divide, then scale from (-1 to 1) -> (0 to 1)
+   at = at.Div(at.Shuffle<3>()).Mul(math::Float4(0.5f, -0.5f, 0.5f, 1.0f)).Add(0.5f);
+   bt = bt.Div(bt.Shuffle<3>()).Mul(math::Float4(0.5f, -0.5f, 0.5f, 1.0f)).Add(0.5f);
+
+   math::Float4 displaySize(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y, 1, 1);
+
+   ac = at.Mul(displaySize).SplitComponents();
+   bc = bt.Mul(displaySize).SplitComponents();
+
+   drawList->AddLine(ImVec2(ac.x, ac.y), ImVec2(bc.x, bc.y), col);
+}
+
 DebugDraw::DebugDraw(ID3D11Device* device, ID3D11DeviceContext* context)
 {
-   mConstantBuffer = CreateBuf
 }
 
 DebugDraw::~DebugDraw()
