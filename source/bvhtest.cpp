@@ -19,7 +19,8 @@ static bool BVHOptimize = 0;
 static bool BVHDraw = 0;
 
 static int BVHDepth = -1;
-static int BVHCount = 128;
+static int BVHNumStaticObjects = 128;
+static int BVHNumDynamicObjects = 128;
 
 static int BVHForceRefresh = -1;
 
@@ -27,24 +28,45 @@ static float BVHRebuildTime = 0;
 static float BVHOptimizeTime = 0;
 static float BVHInsertTime = 0;
 static float BVHQueryTime = 0;
+static float BVHUpdateTime = 0;
+
+static float BVHAreaSize = 128;
+static float BVHAreaHeight = 4;
 
 math::Matrix4 QueryProjMatrix;
 math::Matrix4 QueryViewMatrix;
 
-bvh::BVH3D<MyUser, unsigned int> sBVHTest(BVHCount);
+struct Object
+{
+   math::Float4 position;
+   math::Float4 halfextents;
+   bvh::Handle handle;
+
+   math::Float4 velocity;
+   bool isStatic;
+};
+
+std::vector<Object> Objects;
+
+bvh::BVH3D<MyUser, unsigned int> sBVHTest;
 bvh::BVH3D<MyUser, unsigned int>::QueryStats sBVHStats;
 
 FreeCamera gFreeCamera;
 CameraMatrices gCameraMatrices;
 CameraMatrices gQueryMatrices;
 
+void UpdateCamera()
+{
+   gFreeCamera.Update();
+   gCameraMatrices = gFreeCamera.ComputeMatrices(60.0f, 1.666f, 0.1, 100.0f);
+}
+
 
 void BVH_OnInit(ID3D11Device* device, ID3D11DeviceContext* context)
 {
    gDebugLines = new DebugDraw(device, context);
 
-   gFreeCamera.Update();
-   gCameraMatrices = gFreeCamera.ComputeMatrices(60.0f, 1.666f, 0.1, 10.0f);
+   UpdateCamera();
    gQueryMatrices = gCameraMatrices;
 }
 
@@ -98,7 +120,12 @@ void OnGUI()
       BVHForceRefresh = true;
    }
 
-   if (ImGui::SliderInt("Count", &BVHCount, 0, 1024))
+   if (ImGui::SliderInt("Static Objects", &BVHNumStaticObjects, 0, 1024))
+   {
+      BVHForceRefresh = true;
+   }
+
+   if (ImGui::SliderInt("Dynamic Objects", &BVHNumDynamicObjects, 0, 1024))
    {
       BVHForceRefresh = true;
    }
@@ -117,17 +144,116 @@ void OnGUI()
    {
    }
 
-   ImGui::Text("Cost: %f", sBVHTest.ComputeTotalCost());
-   ImGui::Text("Query Timer %fms", BVHQueryTime);
-   ImGui::Text("Rebuild Timer %fms", BVHRebuildTime);
-   ImGui::Text("Optimize Timer %fms", BVHOptimizeTime);
-   ImGui::Text("Insert Timer %fus", BVHInsertTime * 1000);
+   ImGui::Text("Cost: %.3f", sBVHTest.ComputeTotalCost());
+   ImGui::Text("Query Timer %.3fms", BVHQueryTime);
+   ImGui::Text("Rebuild Timer %.3fms", BVHRebuildTime);
+   ImGui::Text("Optimize Timer %.3fms", BVHOptimizeTime);
+   ImGui::Text("Update Timer %.3fms %.3fus/Object", BVHUpdateTime, (BVHUpdateTime / BVHNumDynamicObjects) * 1000);
+   ImGui::Text("Insert Timer %.3fus", BVHInsertTime * 1000);
+
    ImGui::Text("Failed Intersections: %i", sBVHStats.failedIntersections);
    ImGui::Text("Successful Intersections: %i", sBVHStats.successfulIntersections);
    ImGui::Text("Leaf Count: %i", sBVHStats.leafCount);
 
    ImGui::End();
 
+}
+
+void RebuildBVH()
+{
+   sBVHTest = bvh::BVH3D<MyUser, unsigned int>(BVHNumStaticObjects + BVHNumDynamicObjects);
+
+   Objects.resize(BVHNumStaticObjects + BVHNumDynamicObjects);
+
+   srand(0);
+
+   for (int i = 0; i < Objects.size(); i++)
+   {
+      auto random = [](float min, float max) -> float
+      {
+         float r = (rand() / (float)(RAND_MAX));
+         return r * (max - min) + min;
+      };
+
+      math::Float4 position(random(-BVHAreaSize, BVHAreaSize), random(-BVHAreaHeight, BVHAreaHeight), random(-BVHAreaSize, BVHAreaSize), 0);
+      math::Float4 halfextents(random(0.1f, 8), random(0.1f, 8), random(0.1f, 8), 0);
+
+      Objects[i].position = position;
+      Objects[i].halfextents = halfextents;
+
+      if (i >= BVHNumStaticObjects)
+      {
+         float v = 0.1f;
+         math::Float4 velocity(random(-v, v), random(-v, v), random(-v, v), 0);
+         Objects[i].velocity = velocity;
+         Objects[i].isStatic = false;
+      }
+      else
+      {
+         Objects[i].isStatic = true;
+      }
+   }
+
+   Timer insertTimer;
+
+   int numSamples = 0;
+   bool hasStarted = false;
+
+   for (int i = 0; i < Objects.size(); i++)
+   {
+      if (i == Objects.size() - 100)
+      {
+         insertTimer.start();
+         hasStarted = true;
+      }
+
+      bvh::AABB bounds(
+         Objects[i].position.Sub(Objects[i].halfextents),
+         Objects[i].position.Add(Objects[i].halfextents));
+
+      Objects[i].handle = sBVHTest.Insert(bounds);
+
+      if (hasStarted)
+      {
+         numSamples += 1;
+      }
+   }
+
+   if (hasStarted)
+   {
+      insertTimer.stop();
+      BVHInsertTime = (insertTimer.getMiliseconds()) / numSamples;
+   }
+   else
+   {
+      BVHInsertTime = 0;
+   }
+
+   if (BVHRebuild)
+   {
+      Timer rebuildTimer;
+      rebuildTimer.start();
+      sBVHTest.Rebuild();
+      rebuildTimer.stop();
+      BVHRebuildTime = rebuildTimer.getMiliseconds();
+   }
+   else
+   {
+      BVHRebuildTime = 0;
+   }
+
+   if (BVHOptimize)
+   {
+      Timer optimizeTimer;
+      optimizeTimer.start();
+      sBVHTest.Optimize();
+      optimizeTimer.stop();
+      BVHOptimizeTime = optimizeTimer.getMiliseconds();
+   }
+   else
+   {
+      BVHOptimizeTime = 0;
+   }
 }
 
 
@@ -143,105 +269,59 @@ void BVH_OnTick()
    public:
       virtual void DrawBounds(const bvh::AABB& bounds, const bvh::AABB& parentBounds, int id, int depth, bool isLeaf) const
       {
-         ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 0, 0, 0.4f)));
+         ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 0, 0, 0.1f)));
       }
    };
 
-   gFreeCamera.Update();
-   gCameraMatrices = gFreeCamera.ComputeMatrices(60.0f, 1.666f, 0.1, 10.0f);
-
+   UpdateCamera();
 
    if (BVHForceRefresh)
    {
       BVHForceRefresh = false;
+      RebuildBVH();
+   }
 
-      sBVHTest = bvh::BVH3D<MyUser, unsigned int>(BVHCount);
+   float deltaTime = 60.0f / 1000.0f;
 
-      struct Data
+   Timer updateObjectsTimer;
+
+   for (int i = 0; i < Objects.size(); i++)
+   {
+      if (Objects[i].isStatic == false)
       {
-         bvh::AABB aabb;
-         bvh::Handle handle;
-      };
+         auto pos = Objects[i].position;
+         auto vel = Objects[i].velocity;
 
-      std::vector<Data> data;
-      data.resize(BVHCount);
+         auto spos = pos.SplitComponents();
+         auto svel = vel.SplitComponents();
 
-      srand(0);
-
-      for (int i = 0; i < BVHCount; i++)
-      {
-         auto random = [](float min, float max) -> float
+         if ((spos.x + svel.x) < -BVHAreaSize || (spos.x + svel.x) > BVHAreaSize)
          {
-            float r = (rand() / (float)(RAND_MAX));
-            return r * (max - min) + min;
-         };
-
-         math::Float4 center(random(-128, 128), random(-4, 4), random(-128, 128), 0);
-
-         math::Float4 halfextents(random(0.1f, 8), random(0.1f, 8), random(0.1f, 8), 0);
-         math::Float4 extentsmin = center.Sub(halfextents);
-         math::Float4 extentsmax = center.Add(halfextents);
-
-         data[i].aabb = bvh::AABB(extentsmin, extentsmax);
-      }
-
-      Timer insertTimer;
-
-      int numSamples = 0;
-      bool hasStarted = false;
-
-      for (int i = 0; i < BVHCount; i++)
-      {
-         if (i == BVHCount - 100)
-         {
-            insertTimer.start();
-            hasStarted = true;
+            svel.x *= -1;
          }
 
-         data[i].handle = sBVHTest.Insert(data[i].aabb);
-         
-         if (hasStarted)
+         if ((spos.y + svel.y) < -BVHAreaHeight || (spos.y + svel.y) > BVHAreaHeight)
          {
-            numSamples += 1;
+            svel.y *= -1;
          }
-      }
 
-      if (hasStarted)
-      {
-         insertTimer.stop();
-         BVHInsertTime = (insertTimer.getMiliseconds()) / numSamples;
-      }
-      else
-      {
-         BVHInsertTime = 0;
-      }
+         if ((spos.z + svel.z) < -BVHAreaSize || (spos.z + svel.z) > BVHAreaSize)
+         {
+            svel.z *= -1;
+         }
 
-      if (BVHRebuild)
-      {
-         Timer rebuildTimer;
-         rebuildTimer.start();
-         sBVHTest.Rebuild();
-         rebuildTimer.stop();
-         BVHRebuildTime = rebuildTimer.getMiliseconds();
-      }
-      else
-      {
-         BVHRebuildTime = 0;
-      }
+         Objects[i].velocity = svel;
+         Objects[i].position = pos.Add(svel);
 
-      if (BVHOptimize)
-      {
-         Timer optimizeTimer;
-         optimizeTimer.start();
-         sBVHTest.Optimize();
-         optimizeTimer.stop();
-         BVHOptimizeTime = optimizeTimer.getMiliseconds();
-      }
-      else
-      {
-         BVHOptimizeTime = 0;
+         bvh::AABB bounds(
+            Objects[i].position.Sub(Objects[i].halfextents),
+            Objects[i].position.Add(Objects[i].halfextents));
+
+         sBVHTest.Update(Objects[i].handle, bounds);
       }
    }
+
+   BVHUpdateTime = BVHUpdateTime * 0.5f + updateObjectsTimer.getMiliseconds() * 0.05f;
 
    // Draw the grid
    {

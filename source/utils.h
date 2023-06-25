@@ -2,6 +2,7 @@
 
 #include <d3d11.h>
 #include <DirectXMath.h>
+#include <chrono>
 
 #include "bvh.h"
 #include "imgui.h"
@@ -11,31 +12,43 @@
 class Timer
 {
 public:
+   Timer()
+   {
+      start();
+   }
 
    void start()
    {
-
+      mStartTime = clock();
    }
 
    void stop()
    {
-
+      mStopTime = clock();
    }
 
    float getSeconds()
    {
-      return 0.0f;
+      return getMiliseconds() / 1000.0f;
    }
 
    float getMiliseconds()
    {
-      return 0.0f;
+      clock_t endTime = 0;
+      if (mStopTime == 0)
+      {
+         endTime = clock();
+      }
+      else
+      {
+         endTime = mStopTime;
+      }
+
+      return (float)(endTime - mStartTime);
    }
 
-   float getMicroseconds()
-   {
-      return 0.0f;
-   }
+   clock_t mStartTime = 0;
+   clock_t mStopTime = 0;
 
 };
 

@@ -730,7 +730,7 @@ namespace bvh
 #endif
 		};
 
-		BVH3D(int maxExpectedEntries) 
+		BVH3D(int maxExpectedEntries = 0) 
 		{
 			// Need double the number of maximum expected entries to support the branch nodes
 			mNodes.reserve(maxExpectedEntries * 2);
