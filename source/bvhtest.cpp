@@ -58,7 +58,7 @@ CameraMatrices gQueryMatrices;
 void UpdateCamera()
 {
    gFreeCamera.Update();
-   gCameraMatrices = gFreeCamera.ComputeMatrices(60.0f, 1.666f, 0.1, 100.0f);
+   gCameraMatrices = gFreeCamera.ComputeMatrices(60.0f, 1.666f, 1.0f, 1000.0f);
 }
 
 
@@ -267,9 +267,16 @@ void BVH_OnTick()
    class BVHDrawInterface : public bvh::DrawInterface
    {
    public:
-      virtual void DrawBounds(const bvh::AABB& bounds, const bvh::AABB& parentBounds, int id, int depth, bool isLeaf) const
+      virtual void DrawBounds(const bvh::AABB& bounds, const bvh::AABB& parentBounds, int id, int depth, bool isLeaf, bool isTrueBounds) const override
       {
-         ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 0, 0, 0.1f)));
+         if (isTrueBounds)
+         {
+            ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(1, 0, 0, 1)));
+         }
+         else if (isLeaf)
+         {
+            //ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 0, 1, 1)));
+         }
       }
    };
 

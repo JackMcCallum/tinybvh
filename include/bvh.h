@@ -3,6 +3,13 @@
 
 TODO LIST:
 Remove use of Queue, avoid dynamic allocations and instead use stack allocated memory
+Move the user data to the handle list instead, only leaf nodes need it
+Add author to the system, write up the readme and licence stuff
+Fix white space
+Optimize with sphere tests
+Implement ray casts
+Box queries
+Orthographic queries
 
 */
 
@@ -629,6 +636,19 @@ namespace bvh
 			return out;
 		}
 
+      // Returns true if this fully contains containee
+      bool Contains(const AABB& containee)
+      {
+         __m128i lt = _mm_castps_si128(_mm_cmplt_ps(containee.min.m, min.m));
+         __m128i gt = _mm_castps_si128(_mm_cmpgt_ps(containee.max.m, max.m));
+         __m128i one = _mm_set1_epi32(0xFFFFFFFF);
+
+         int r0 = _mm_test_all_zeros(lt, one);
+         int r1 = _mm_test_all_zeros(gt, one);
+
+         return r0 != 0 && r1 != 0;
+      }
+
       float ComputeVolume() const
       {
          math::Float4 extents = max.Sub(min);
@@ -681,7 +701,7 @@ namespace bvh
    class DrawInterface
    {
    public:
-      virtual void DrawBounds(const AABB& bounds, const AABB& parentBounds, int nodeId, int depth, bool isLeaf) const = 0;
+      virtual void DrawBounds(const AABB& bounds, const AABB& parentBounds, int nodeId, int depth, bool isLeaf, bool isTrueBounds) const = 0;
    };
 
 	template<typename UserDataType = uintptr_t, typename IndexType = unsigned short>
@@ -706,13 +726,20 @@ namespace bvh
          int leafCount = 0;
       };
 
+      struct HandleData
+      {
+         IndexType node;
+         AABB originalBounds;
+         UserDataType userData;
+      };
+
       struct Node
       {
          IndexType parent;
          IndexType child0;
          IndexType child1;
-         UserDataType userData;
-         AABB originalAABB;
+         IndexType handleIndex;
+         AABB bounds;
 
          bool isLeaf() const
          {
@@ -734,7 +761,7 @@ namespace bvh
 		{
 			// Need double the number of maximum expected entries to support the branch nodes
 			mNodes.reserve(maxExpectedEntries * 2);
-			mHandleToNodeIndex.reserve(maxExpectedEntries);
+			mHandles.reserve(maxExpectedEntries);
 		}
 
 		~BVH3D() 
@@ -750,38 +777,78 @@ namespace bvh
 				return INVALID_HANDLE;
 			}
 
-			return AllocateHandle(index);
+         Handle handle = AllocateHandle();
+
+         // Doubly linked handle
+         mHandles[handle.id].originalBounds = bounds;
+
+         mHandles[handle.id].node = index;
+         mNodes[index].handleIndex = handle.id;
+
+			return handle;
 		}
 
 		void Update(Handle handle, const AABB& newBounds)
 		{
-			// Reallocate the internal index
-			IndexType oldIndex = mHandleToNodeIndex[handle.id];
+         BVH_ASSERT(handle.id != INVALID_HANDLE.id);
 
-			// Grab the user data and store it locally
-			UserDataType userData = mNodes[oldIndex].userData;
+         // Reallocate the internal index
+         IndexType index = mHandles[handle.id].node;
 
-			// Remove the old index
-			RemoveFromBVH(oldIndex);
+         auto& node = mNodes[index];
 
-			// Reinsert the user data and get the new index
-			IndexType newIndex = InsertIntoBVH(newBounds);
+         // No change needed
+         if (node.bounds.Contains(newBounds))
+         {
+            // Update the bounds
+            mHandles[handle.id].originalBounds = newBounds;
+            return;
+         }
 
-			// Remap the handle to the new index
-			mHandleToNodeIndex[handle.id] = newIndex;
+
+
+         math::Float4 minVel = newBounds.min.Sub(mHandles[handle.id].originalBounds.min);
+         math::Float4 maxVel = newBounds.max.Sub(mHandles[handle.id].originalBounds.max);
+
+         static int cycle = 0;
+         float advance = 8.0f + (cycle++ % 4);
+         AABB predictedAABB = AABB(
+            newBounds.min.Add(minVel.Mul(advance)),
+            newBounds.max.Add(maxVel.Mul(advance)));
+
+         AABB expandedBounds = predictedAABB.ComputeMerged(newBounds);
+
+         // Grab the user data and store it locally
+         IndexType handleIndex = node.handleIndex;
+
+         // Remove the old index
+         RemoveFromBVH(index);
+
+         // Reinsert the user data and get the new index
+         IndexType newIndex = InsertIntoBVH(expandedBounds);
+
+         mNodes[newIndex].handleIndex = handleIndex;
+
+         // Remap the handle to the new indexs
+         mHandles[handle.id].originalBounds = newBounds;
+         mHandles[handle.id].node = newIndex;
 		}
 
 		// Remove leaf entry
 		void Remove(Handle handle)
 		{
-			RemoveFromBVH(mHandleToNodeIndex[handle.id]);
+         // Unlink the handle from the node
+         mNodes[mHandles[handle.id].node].handleIndex = INVALID_INDEX_VALUE;
+         mHandles[handle.id].node = INVALID_INDEX_VALUE;
+
+			RemoveFromBVH(mHandles[handle.id].node);
 			ReleaseHandle(handle);
 		}
 
 		// Access the bounding volume of a leaf
 		const AABB& GetBounds(Handle handle) const
 		{
-			return mNodes[handle.id].originalAABB;
+			return mNodes[handle.id].bounds;
 		}
 
 		// Access the user data of a leaf
@@ -844,8 +911,8 @@ namespace bvh
 
             for (IndexType i = rangeBegin; i < rangeEnd; i++)
             {
-               min = mNodes[leafNodes[i]].originalAABB.min.Min(min);
-               max = mNodes[leafNodes[i]].originalAABB.max.Max(max);
+               min = mNodes[leafNodes[i]].bounds.min.Min(min);
+               max = mNodes[leafNodes[i]].bounds.max.Max(max);
             }
 
             return AABB(min, max);
@@ -865,8 +932,8 @@ namespace bvh
             Range range = pendingRanges.back();
             pendingRanges.pop_back();
 
-            math::Float4 min = mNodes[range.node].originalAABB.min;
-            math::Float4 max = mNodes[range.node].originalAABB.max;
+            math::Float4 min = mNodes[range.node].bounds.min;
+            math::Float4 max = mNodes[range.node].bounds.max;
 
             // Measure largest axis
             math::Float4::Components extents = max.Sub(min).SplitComponents();
@@ -889,8 +956,8 @@ namespace bvh
             std::sort(leafNodes.begin() + range.rangeBegin, leafNodes.begin() + range.rangeEnd, 
                [&](IndexType a, IndexType b)
             {
-               math::Float4 ap = mNodes[a].originalAABB.max.Add(mNodes[a].originalAABB.min).Mul(0.5f);
-               math::Float4 bp = mNodes[b].originalAABB.max.Add(mNodes[b].originalAABB.min).Mul(0.5f);
+               math::Float4 ap = mNodes[a].bounds.max.Add(mNodes[a].bounds.min).Mul(0.5f);
+               math::Float4 bp = mNodes[b].bounds.max.Add(mNodes[b].bounds.min).Mul(0.5f);
                return ap.SplitComponents()[largestAxis] > bp.SplitComponents()[largestAxis] ? 1 : 0;
             });
 
@@ -953,6 +1020,13 @@ namespace bvh
 
 		void Query(const ConvexHullView& hull, QueryCallbackFunc callback, void* user, QueryStats* stats) const
 		{
+         if (stats)
+         {
+            stats->leafCount = 0;
+            stats->failedIntersections = 0;
+            stats->successfulIntersections = 0;
+         }
+
 			ConvexHullQueryNode(hull, mRootIndex, callback, user, stats);
 		}
 
@@ -971,7 +1045,7 @@ namespace bvh
                node.child0 != INVALID_INDEX_VALUE &&
                node.child1 != INVALID_INDEX_VALUE)
             {
-               totalCost += node.originalAABB.ComputeSurfaceArea();
+               totalCost += node.bounds.ComputeSurfaceArea();
             }
          }
 
@@ -979,7 +1053,7 @@ namespace bvh
       }
 
 	private:
-		Handle AllocateHandle(IndexType nodeIndex)
+		Handle AllocateHandle()
 		{
 			Handle handle = INVALID_HANDLE;
 			if (mFreeHandles.size() > 0)
@@ -989,17 +1063,15 @@ namespace bvh
 			}
 			else
 			{
-				handle.id = NumericCast<int>(mHandleToNodeIndex.size());
-				mHandleToNodeIndex.resize(mHandleToNodeIndex.size() + 1);
+				handle.id = NumericCast<int>(mHandles.size());
+				mHandles.resize(mHandles.size() + 1);
 			}
 
-			mHandleToNodeIndex[handle.id] = nodeIndex;
 			return handle;
 		}
 
 		void ReleaseHandle(Handle handle)
 		{
-			mHandleToNodeIndex[handle.id] = INVALID_INDEX_VALUE;
 			mFreeHandles.push_back(handle);
 		}
 
@@ -1037,8 +1109,7 @@ The BVH will continue to operate normally until the limit is reached");
 #if USE_VALIDATION
 			node.isDead = false;
 #endif
-			node.originalAABB = bounds;
-			node.userData = {};
+			node.bounds = bounds;
 
 			return index;
 		}
@@ -1052,21 +1123,20 @@ The BVH will continue to operate normally until the limit is reached");
 #if USE_VALIDATION
 			node.isDead = true;
 #endif
-			node.userData = {};
 
 			mFreeNodes.push_back(index);
 		}
 
       float ComputeSiblingCost(const AABB& bounds, IndexType siblingIndex) const
       {
-         AABB tmpBounds = mNodes[siblingIndex].originalAABB.ComputeMerged(bounds);
+         AABB tmpBounds = mNodes[siblingIndex].bounds.ComputeMerged(bounds);
          float cost = tmpBounds.ComputeCostHeuristic();
 
          IndexType tmp = mNodes[siblingIndex].parent;
          while (tmp != INVALID_INDEX_VALUE)
          {
-            float volumeBefore = mNodes[tmp].originalAABB.ComputeCostHeuristic();
-            float volumeAfter = mNodes[tmp].originalAABB.ComputeMerged(tmpBounds).ComputeCostHeuristic();
+            float volumeBefore = mNodes[tmp].bounds.ComputeCostHeuristic();
+            float volumeAfter = mNodes[tmp].bounds.ComputeMerged(tmpBounds).ComputeCostHeuristic();
 
             cost += volumeAfter - volumeBefore;
             tmp = mNodes[tmp].parent;
@@ -1077,14 +1147,14 @@ The BVH will continue to operate normally until the limit is reached");
 
       float ComputeCostDelta(const AABB& bounds, IndexType nodeIndex) const
       {
-         float costBefore = mNodes[nodeIndex].originalAABB.ComputeCostHeuristic();
-         float costAfter = mNodes[nodeIndex].originalAABB.ComputeMerged(bounds).ComputeCostHeuristic();
+         float costBefore = mNodes[nodeIndex].bounds.ComputeCostHeuristic();
+         float costAfter = mNodes[nodeIndex].bounds.ComputeMerged(bounds).ComputeCostHeuristic();
          return costAfter - costBefore;
       }
 
       float ComputeDirectCost(const AABB& bounds, IndexType nodeIndex) const
       {
-         return mNodes[nodeIndex].originalAABB.ComputeMerged(bounds).ComputeCostHeuristic();
+         return mNodes[nodeIndex].bounds.ComputeMerged(bounds).ComputeCostHeuristic();
       }
 
 		IndexType FindBestSibling(const AABB& bounds) const
@@ -1178,10 +1248,10 @@ The BVH will continue to operate normally until the limit is reached");
 			BVH_ASSERT(siblingIndex != INVALID_INDEX_VALUE);
 
 			AABB tmpBounds;
-			tmpBounds = mNodes[siblingIndex].originalAABB.ComputeMerged(mNodes[index].originalAABB);
+			tmpBounds = mNodes[siblingIndex].bounds.ComputeMerged(mNodes[index].bounds);
 			float costA = tmpBounds.ComputeCostHeuristic();
 
-			tmpBounds = mNodes[siblingIndex].originalAABB.ComputeMerged(mNodes[uncleIndex].originalAABB);
+			tmpBounds = mNodes[siblingIndex].bounds.ComputeMerged(mNodes[uncleIndex].bounds);
 			float costB = tmpBounds.ComputeCostHeuristic();
 
 			if (costA > costB)
@@ -1210,7 +1280,7 @@ The BVH will continue to operate normally until the limit is reached");
 				mNodes[uncleIndex].parent = parentIndex;
 
 				// Refit the original parent
-				mNodes[parentIndex].originalAABB = tmpBounds;
+				mNodes[parentIndex].bounds = tmpBounds;
 
 				Validate();
 			}
@@ -1238,7 +1308,7 @@ The BVH will continue to operate normally until the limit is reached");
 			}
 			else
 			{
-				AABB newBounds = bounds.ComputeMerged(mNodes[siblingIndex].originalAABB);
+				AABB newBounds = bounds.ComputeMerged(mNodes[siblingIndex].bounds);
 
 				IndexType newParent = AllocateNode(newBounds);
 				if (newParent == INVALID_INDEX_VALUE)
@@ -1288,8 +1358,8 @@ The BVH will continue to operate normally until the limit is reached");
 					IndexType c0 = mNodes[tmp].child0;
 					IndexType c1 = mNodes[tmp].child1;
 
-					AABB combinedChildBounds = mNodes[c0].originalAABB.ComputeMerged(mNodes[c1].originalAABB);
-					mNodes[tmp].originalAABB = combinedChildBounds;
+					AABB combinedChildBounds = mNodes[c0].bounds.ComputeMerged(mNodes[c1].bounds);
+					mNodes[tmp].bounds = combinedChildBounds;
 
 					Rotate(tmp);
 					Validate();
@@ -1367,8 +1437,8 @@ The BVH will continue to operate normally until the limit is reached");
 				IndexType c0 = mNodes[tmp].child0;
 				IndexType c1 = mNodes[tmp].child1;
 
-				AABB combinedChildBounds = mNodes[c0].originalAABB.ComputeMerged(mNodes[c1].originalAABB);
-				mNodes[tmp].originalAABB = combinedChildBounds;
+				AABB combinedChildBounds = mNodes[c0].bounds.ComputeMerged(mNodes[c1].bounds);
+				mNodes[tmp].bounds = combinedChildBounds;
 
 				tmp = mNodes[tmp].parent;
 			}
@@ -1385,12 +1455,21 @@ The BVH will continue to operate normally until the limit is reached");
 
          if (mNodes[currentNode].parent != INVALID_INDEX_VALUE)
          {
-            callbacks->DrawBounds(mNodes[currentNode].originalAABB, mNodes[mNodes[currentNode].parent].originalAABB, currentNode, depth, isLeaf);
+            callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[mNodes[currentNode].parent].bounds, 
+               currentNode, depth, isLeaf, false);
          }
          else
          {
-            callbacks->DrawBounds(mNodes[currentNode].originalAABB, mNodes[currentNode].originalAABB, currentNode, depth, isLeaf);
+            callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[currentNode].bounds, 
+               currentNode, depth, isLeaf, false);
          }
+
+         if (isLeaf)
+         {
+            callbacks->DrawBounds(mHandles[mNodes[currentNode].handleIndex].originalBounds, mHandles[mNodes[currentNode].handleIndex].originalBounds,
+               currentNode, depth, false, true);
+         }
+
 
 			DrawTree(callbacks, mNodes[currentNode].child0, depth + 1);
 			DrawTree(callbacks, mNodes[currentNode].child1, depth + 1);
@@ -1405,7 +1484,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 			const Node& node = mNodes[currentNode];
 
-         AABBConvexHullStorage permutedAABB = node.originalAABB.ComputeConvexHullStorage();
+         AABBConvexHullStorage permutedAABB = node.bounds.ComputeConvexHullStorage();
 
          if (IntersectsWith(hull, permutedAABB.GetView(), false))
          {
@@ -1419,7 +1498,7 @@ The BVH will continue to operate normally until the limit is reached");
                }
 
                // Leaf
-               callback(node.userData, node.originalAABB, user);
+               callback(mHandles[node.handleIndex].userData, node.bounds, user);
             }
             else
             {
@@ -1506,9 +1585,9 @@ The BVH will continue to operate normally until the limit is reached");
             }
          }
 
-         for (int i = 0; i < mHandleToNodeIndex.size(); i++)
+         for (int i = 0; i < mHandles.size(); i++)
          {
-            mHandleToNodeIndex[i] = oldToNewLUT[i];
+            mHandles[i].node = oldToNewLUT[i];
          }
 
          mNodes = std::move(newNodes);
@@ -1598,7 +1677,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 		// Indirect mappings from handle to index and index to handle
 		// This indirection allows remapping the internal indices to optimize during runtime
-		std::vector<IndexType> mHandleToNodeIndex;
+		std::vector<HandleData> mHandles;
 
 		// Free lists to handle quick allocation
 		std::vector<IndexType> mFreeNodes;
