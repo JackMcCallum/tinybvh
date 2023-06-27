@@ -30,8 +30,10 @@ static float BVHInsertTime = 0;
 static float BVHQueryTime = 0;
 static float BVHUpdateTime = 0;
 
-static float BVHAreaSize = 128;
-static float BVHAreaHeight = 4;
+static float BruteForceTimer = 0;
+
+static float BVHAreaSize = 256;
+static float BVHAreaHeight = 16;
 
 math::Matrix4 QueryProjMatrix;
 math::Matrix4 QueryViewMatrix;
@@ -145,15 +147,27 @@ void OnGUI()
    }
 
    ImGui::Text("Cost: %.3f", sBVHTest.ComputeTotalCost());
-   ImGui::Text("Query Timer %.3fms", BVHQueryTime);
+   ImGui::Text("Query Timer %.3fus", BVHQueryTime * 1000);
+   ImGui::Text("Brute Force Timer %.3fus", BruteForceTimer * 1000);
+   ImGui::Text("Percent Faster %.3f", (BruteForceTimer / BVHQueryTime) * 100);
    ImGui::Text("Rebuild Timer %.3fms", BVHRebuildTime);
    ImGui::Text("Optimize Timer %.3fms", BVHOptimizeTime);
    ImGui::Text("Update Timer %.3fms %.3fus/Object", BVHUpdateTime, (BVHUpdateTime / BVHNumDynamicObjects) * 1000);
    ImGui::Text("Insert Timer %.3fus", BVHInsertTime * 1000);
 
-   ImGui::Text("Failed Intersections: %i", sBVHStats.failedIntersections);
-   ImGui::Text("Successful Intersections: %i", sBVHStats.successfulIntersections);
+
+   ImGui::Text("Test Node Time %.3fns", (BVHQueryTime / sBVHStats.totalNodesVisited) * 1000000);
+
+   ImGui::Text("Failed SAT Intersections: %i", sBVHStats.failedSATIntersections);
+   ImGui::Text("Successful SAT Intersections: %i", sBVHStats.successfulSATIntersections);
+   ImGui::Text("VIH Tests: %i", sBVHStats.numVIHTests);
    ImGui::Text("Leaf Count: %i", sBVHStats.leafCount);
+   ImGui::Text("SAT Skipped: %i", sBVHStats.separatingAxisTheoremSkipped);
+   ImGui::Text("Insersections Bypassed: %i", sBVHStats.intersectionsBypassed);
+   ImGui::Text("Nodes Visited: %i", sBVHStats.totalNodesVisited);
+
+   ImGui::Text("Total SAT Time: %fus (%fus each)", sBVHStats.totalSATTime, sBVHStats.totalSATTime / (sBVHStats.successfulSATIntersections + sBVHStats.failedSATIntersections));
+   ImGui::Text("Total VIH Time: %fus (%fus each)", sBVHStats.totalVIHTime, sBVHStats.totalVIHTime / (sBVHStats.numVIHTests));
 
    ImGui::End();
 
@@ -176,14 +190,14 @@ void RebuildBVH()
       };
 
       math::Float4 position(random(-BVHAreaSize, BVHAreaSize), random(-BVHAreaHeight, BVHAreaHeight), random(-BVHAreaSize, BVHAreaSize), 0);
-      math::Float4 halfextents(random(0.1f, 8), random(0.1f, 8), random(0.1f, 8), 0);
+      math::Float4 halfextents(random(0.1f, 1), random(0.1f, 1), random(0.1f, 1), 0);
 
       Objects[i].position = position;
       Objects[i].halfextents = halfextents;
 
       if (i >= BVHNumStaticObjects)
       {
-         float v = 0.1f;
+         float v = 0.9f;
          math::Float4 velocity(random(-v, v), random(-v, v), random(-v, v), 0);
          Objects[i].velocity = velocity;
          Objects[i].isStatic = false;
@@ -194,7 +208,7 @@ void RebuildBVH()
       }
    }
 
-   Timer insertTimer;
+   bvh::Timer insertTimer;
 
    int numSamples = 0;
    bool hasStarted = false;
@@ -231,7 +245,7 @@ void RebuildBVH()
 
    if (BVHRebuild)
    {
-      Timer rebuildTimer;
+       bvh::Timer rebuildTimer;
       rebuildTimer.start();
       sBVHTest.Rebuild();
       rebuildTimer.stop();
@@ -244,7 +258,7 @@ void RebuildBVH()
 
    if (BVHOptimize)
    {
-      Timer optimizeTimer;
+       bvh::Timer optimizeTimer;
       optimizeTimer.start();
       sBVHTest.Optimize();
       optimizeTimer.stop();
@@ -290,7 +304,7 @@ void BVH_OnTick()
 
    float deltaTime = 60.0f / 1000.0f;
 
-   Timer updateObjectsTimer;
+   bvh::Timer updateObjectsTimer;
 
    for (int i = 0; i < Objects.size(); i++)
    {
@@ -352,7 +366,7 @@ void BVH_OnTick()
    }
 
 
-   Timer timer;
+   bvh::Timer timer;
 
    {
 
@@ -360,7 +374,7 @@ void BVH_OnTick()
 
       math::Matrix4 invProjViewMatrix2 = *(math::Matrix4*)&gQueryMatrices.invProjViewMatrix;
 
-      bvh::FrustumConvexHull<true> frustum;
+      bvh::FrustumConvexHull<false> frustum;
       frustum.InitializeFromProjectionMatrix(invProjViewMatrix2);
 
       unsigned int color = 0xFFFFFFFF;
@@ -383,19 +397,40 @@ void BVH_OnTick()
       timer.start();
 
       // Query and do nothing to get a measurement of just the query
-      sBVHTest.Query(frustum.GetView(), [](const MyUser& data, const bvh::AABB& bounds, void* user)
+      for (int i = 0; i < 30; i++)
       {
-      }, nullptr, &sBVHStats);
+          sBVHTest.Query(frustum.GetView(), [](const MyUser& data, const bvh::AABB& bounds, void* user)
+              {
+              }, nullptr, &sBVHStats);
+      }
 
       timer.stop();
       
-      BVHQueryTime = BVHQueryTime * 0.5f + timer.getMiliseconds() * 0.05f;
+      BVHQueryTime = timer.getMiliseconds() / 30.0f;
 
       // Query again but this time draw
       sBVHTest.Query(frustum.GetView(), [](const MyUser& data, const bvh::AABB& bounds, void* user)
       {
          ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 1, 0, 1.0f)));
-      }, nullptr, &sBVHStats);
+      }, nullptr, nullptr);
+
+      timer.start();
+
+      auto frustumView = frustum.GetView();
+
+      for (auto iter : Objects)
+      {
+          auto storage = sBVHTest.GetBounds(iter.handle).ComputeConvexHullStorage();
+
+          if (bvh::IntersectsWith(frustumView, storage.GetView(), true))
+          {
+
+          }
+      }
+
+      timer.stop();
+      BruteForceTimer = timer.getMiliseconds();
+
    }
 
    BVHDrawInterface drawInterface;

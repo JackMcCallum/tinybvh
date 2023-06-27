@@ -9,49 +9,6 @@
 
 #define D3D_RELEASE(Ptr) if (Ptr != nullptr) { Ptr->Release(); } 
 
-class Timer
-{
-public:
-   Timer()
-   {
-      start();
-   }
-
-   void start()
-   {
-      mStartTime = clock();
-   }
-
-   void stop()
-   {
-      mStopTime = clock();
-   }
-
-   float getSeconds()
-   {
-      return getMiliseconds() / 1000.0f;
-   }
-
-   float getMiliseconds()
-   {
-      clock_t endTime = 0;
-      if (mStopTime == 0)
-      {
-         endTime = clock();
-      }
-      else
-      {
-         endTime = mStopTime;
-      }
-
-      return (float)(endTime - mStartTime);
-   }
-
-   clock_t mStartTime = 0;
-   clock_t mStopTime = 0;
-
-};
-
 // Setups the global data for debug lines
 void DebugDraw_OnInit(ID3D11Device* device, ID3D11DeviceContext* context);
 void DebugDraw_OnShutdown();

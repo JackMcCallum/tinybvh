@@ -53,17 +53,17 @@ namespace math
 			float z;
 			float w;
 
-         const float& operator[](int i) const
-         {
-            BVH_ASSERT(i >= 0 && i < 4);
-            return (&x)[i];
-         }
+			const float& operator[](int i) const
+			{
+				BVH_ASSERT(i >= 0 && i < 4);
+				return (&x)[i];
+			}
 
-         float& operator[](int i)
-         {
-            BVH_ASSERT(i >= 0 && i < 4);
-            return (&x)[i];
-         }
+			float& operator[](int i)
+			{
+				BVH_ASSERT(i >= 0 && i < 4);
+				return (&x)[i];
+			}
 		};
 
 		BVH_FORCEINLINE Float4()
@@ -150,89 +150,89 @@ namespace math
 			return result[0] + result[1] + result[2];
 		}
 
-      // Compute the dot product on XYZW components
-      BVH_FORCEINLINE float Dot4(Float4 rhs) const
-      {
-         __m128 mult = _mm_mul_ps(m, rhs.m);
+		// Compute the dot product on XYZW components
+		BVH_FORCEINLINE float Dot4(Float4 rhs) const
+		{
+			__m128 mult = _mm_mul_ps(m, rhs.m);
 
-         float result[4];
-         _mm_store_ps(result, mult);
+			float result[4];
+			_mm_store_ps(result, mult);
 
-         return result[0] + result[1] + result[2] + result[3];
-      }
+			return result[0] + result[1] + result[2] + result[3];
+		}
 
-      // Compute the dot product on XYZW components
-      BVH_FORCEINLINE Float4 Cross(Float4 rhs) const
-      {
-         const Float4& lhs = *this;
+		// Compute the dot product on XYZW components
+		BVH_FORCEINLINE Float4 Cross(Float4 rhs) const
+		{
+			const Float4& lhs = *this;
 
-         Float4 a = lhs.Shuffle<1, 2, 0, 3>();
-         Float4 b = rhs.Shuffle<2, 0, 1, 3>();
-         Float4 c = lhs.Shuffle<2, 0, 1, 3>();
-         Float4 d = rhs.Shuffle<1, 2, 0, 3>();
+			Float4 a = lhs.Shuffle<1, 2, 0, 3>();
+			Float4 b = rhs.Shuffle<2, 0, 1, 3>();
+			Float4 c = lhs.Shuffle<2, 0, 1, 3>();
+			Float4 d = rhs.Shuffle<1, 2, 0, 3>();
 
-         Float4 l = a.Mul(b);
-         Float4 r = c.Mul(d);
+			Float4 l = a.Mul(b);
+			Float4 r = c.Mul(d);
 
-         return l.Sub(r);
-      }
+			return l.Sub(r);
+		}
 
-      // Compute the dot product on XYZW components
-      BVH_FORCEINLINE Components SplitComponents() const
-      {
-         Components components;
-         _mm_store_ps((float*)&components, m);
-         return components;
-      }
+		// Compute the dot product on XYZW components
+		BVH_FORCEINLINE Components SplitComponents() const
+		{
+			Components components;
+			_mm_store_ps((float*)&components, m);
+			return components;
+		}
 
-      template<int X, int Y, int Z, int W>
-      BVH_FORCEINLINE Float4 Shuffle() const
-      {
-         // Note, flipped for personal sanity
-         // I dont understand why this macro is flipped this way
-         // Something to do with the order of components vs the order of bits i think?
-         // It makes sense to flip it, so Shuffle<0, 0, 3, 2>() would result in xxwz and !zwxx
-         return _mm_shuffle_ps(m, m, _MM_SHUFFLE(W, Z, Y, X));
-      }
+		template<int X, int Y, int Z, int W>
+		BVH_FORCEINLINE Float4 Shuffle() const
+		{
+			// Note, flipped for personal sanity
+			// I dont understand why this macro is flipped this way
+			// Something to do with the order of components vs the order of bits i think?
+			// It makes sense to flip it, so Shuffle<0, 0, 3, 2>() would result in xxwz and !zwxx
+			return _mm_shuffle_ps(m, m, _MM_SHUFFLE(W, Z, Y, X));
+		}
 
-      template<int N>
-      BVH_FORCEINLINE Float4 Shuffle() const
-      {
-         return _mm_shuffle_ps(m, m, _MM_SHUFFLE(N, N, N, N));
-      }
+		template<int N>
+		BVH_FORCEINLINE Float4 Shuffle() const
+		{
+			return _mm_shuffle_ps(m, m, _MM_SHUFFLE(N, N, N, N));
+		}
 
 		__m128 m;
 	};
 
-   struct Matrix4
-   {
-      Matrix4()
-      {
-         // Init to identity
-         m[0] = Float4(1, 0, 0, 0);
-         m[1] = Float4(0, 1, 0, 0);
-         m[2] = Float4(0, 0, 1, 0);
-         m[3] = Float4(0, 0, 0, 1);
-      }
+	struct Matrix4
+	{
+		Matrix4()
+		{
+			// Init to identity
+			m[0] = Float4(1, 0, 0, 0);
+			m[1] = Float4(0, 1, 0, 0);
+			m[2] = Float4(0, 0, 1, 0);
+			m[3] = Float4(0, 0, 0, 1);
+		}
 
-      Float4 m[4];
+		Float4 m[4];
 
-      // Multiply vector by matrix
-      Float4 Multiply(const Float4& in) const
-      {
-         Float4 xP = in.Shuffle<0>();
-         Float4 yP = in.Shuffle<1>();
-         Float4 zP = in.Shuffle<2>();
-         Float4 wP = in.Shuffle<3>();
+		// Multiply vector by matrix
+		Float4 Multiply(const Float4& in) const
+		{
+			Float4 xP = in.Shuffle<0>();
+			Float4 yP = in.Shuffle<1>();
+			Float4 zP = in.Shuffle<2>();
+			Float4 wP = in.Shuffle<3>();
 
-         Float4 xC = xP.Mul(m[0]);
-         Float4 yC = yP.Mul(m[1]);
-         Float4 zC = zP.Mul(m[2]);
-         Float4 wC = wP.Mul(m[3]);
+			Float4 xC = xP.Mul(m[0]);
+			Float4 yC = yP.Mul(m[1]);
+			Float4 zC = zP.Mul(m[2]);
+			Float4 wC = wP.Mul(m[3]);
 
-         return xC.Add(yC).Add(zC).Add(wC);
-      }
-   };
+			return xC.Add(yC).Add(zC).Add(wC);
+		}
+	};
 
 	static const Float4 HALF = Float4(0.5f, 0.5f, 0.5f, 0.5f);
 	static const Float4 ZERO = Float4(0, 0, 0, 0);
@@ -240,14 +240,14 @@ namespace math
 	static const Float4 LARGEST_POSITIVE = Float4(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
 	static const Float4 LARGEST_NEGATIVE = Float4(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
 	static const Float4 SMALLEST_POSITIVE = Float4(FLT_MIN, FLT_MIN, FLT_MIN, FLT_MIN);
-   static const Float4 SMALLEST_NEGATIVE = Float4(-FLT_MIN, -FLT_MIN, -FLT_MIN, -FLT_MIN);
+	static const Float4 SMALLEST_NEGATIVE = Float4(-FLT_MIN, -FLT_MIN, -FLT_MIN, -FLT_MIN);
 
-   static const Float4 AXES_VECTORS[4] = {
-      Float4(1, 0, 0, 0),
-      Float4(0, 1, 0, 0),
-      Float4(0, 0, 1, 0),
-      Float4(0, 0, 0, 1),
-   };
+	static const Float4 AXES_VECTORS[4] = {
+	   Float4(1, 0, 0, 0),
+	   Float4(0, 1, 0, 0),
+	   Float4(0, 0, 1, 0),
+	   Float4(0, 0, 0, 1),
+	};
 }
 
 namespace bvh
@@ -255,6 +255,71 @@ namespace bvh
 	struct Handle
 	{
 		int id = -1;
+	};
+
+	class Timer
+	{
+	public:
+		static double GetTimeNowAsSeconds()
+		{
+			static LARGE_INTEGER frequency;
+
+			static bool init = false;
+			if (!init)
+			{
+				QueryPerformanceFrequency(&frequency);
+				init = true;
+			}
+
+			LARGE_INTEGER currentTime;
+			QueryPerformanceCounter(&currentTime);
+
+			return ((double)currentTime.QuadPart / (double)frequency.QuadPart);
+		}
+
+		Timer()
+		{
+			start();
+		}
+
+		void start()
+		{
+			mStartTime = GetTimeNowAsSeconds();
+		}
+
+		void stop()
+		{
+			mStopTime = GetTimeNowAsSeconds();
+		}
+
+		double getSeconds()
+		{
+			double endTime = 0;
+			if (mStopTime == 0)
+			{
+				endTime = GetTimeNowAsSeconds();
+			}
+			else
+			{
+				endTime = mStopTime;
+			}
+
+			return endTime - mStartTime;
+		}
+
+		double getMiliseconds()
+		{
+			return getSeconds() * 1000;
+		}
+
+		double getMicroseconds()
+		{
+			return getSeconds() * 1000000;
+		}
+
+		double mStartTime = 0;
+		double mStopTime = 0;
+
 	};
 
 	// Adds a layer of safety to numeric type casting
@@ -319,302 +384,418 @@ namespace bvh
 
 	static const Handle INVALID_HANDLE = { -1 };
 
-   template<typename T>
-   class MemoryView
-   {
-   public:
-      MemoryView(const T* memory, int count)
-      {
-         mMemory = memory;
-         mCount = count;
-      }
+	template<typename T>
+	class MemoryView
+	{
+	public:
+		MemoryView(const T* memory, int count)
+		{
+			mMemory = memory;
+			mCount = count;
+		}
 
-      const T& operator[](int idx) const
-      {
-         assert(idx >= 0 && idx < mCount);
-         return mMemory[idx];
-      }
+		const T& operator[](int idx) const
+		{
+			assert(idx >= 0 && idx < mCount);
+			return mMemory[idx];
+		}
 
-      T& operator[](int idx)
-      {
-         assert(idx >= 0 && idx < mCount);
-         return mMemory[idx];
-      }
+		T& operator[](int idx)
+		{
+			assert(idx >= 0 && idx < mCount);
+			return mMemory[idx];
+		}
 
-      int Count() const { return mCount; }
+		int Count() const { return mCount; }
 
-      const T* begin() const { return &mMemory[0]; }
-      T* begin() { return &mMemory[0]; }
+		const T* begin() const { return &mMemory[0]; }
+		T* begin() { return &mMemory[0]; }
 
-      const T* end() const { return &mCount[0]; }
-      T* end() { return &mCount[0]; }
+		const T* end() const { return &mCount[0]; }
+		T* end() { return &mCount[0]; }
 
-   private:
-      const T* mMemory;
-      int mCount;
-   };
+	private:
+		const T* mMemory;
+		int mCount;
+	};
 
-   template<typename T>
-   class ConstMemoryView
-   {
-   public:
-      ConstMemoryView(const T* memory, int count)
-      {
-         mMemory = memory;
-         mCount = count;
-      }
+	template<typename T>
+	class ConstMemoryView
+	{
+	public:
+		ConstMemoryView(const T* memory, int count)
+		{
+			mMemory = memory;
+			mCount = count;
+		}
 
-      const T& operator[](int idx) const
-      {
-         BVH_ASSERT(idx >= 0 && idx < mCount);
-         return mMemory[idx];
-      }
+		const T& operator[](int idx) const
+		{
+			BVH_ASSERT(idx >= 0 && idx < mCount);
+			return mMemory[idx];
+		}
 
-      int Count() const { return mCount; }
+		int Count() const { return mCount; }
 
-      const T* begin() const { return &mMemory[0]; }
-      const T* end() const { return &mMemory[mCount]; }
+		const T* begin() const { return &mMemory[0]; }
+		const T* end() const { return &mMemory[mCount]; }
 
-   private:
-      const T* mMemory = nullptr;
-      int mCount = 0;
-   };
+	private:
+		const T* mMemory = nullptr;
+		int mCount = 0;
+	};
 
-   // A view into a convex hull, allowing statically or dynamically allocated, varying sizes to be used
-   class ConvexHullView
-   {
-   public:
-      ConvexHullView(
-         ConstMemoryView<math::Float4> _edgeAxisVectors,
-         ConstMemoryView<math::Float4> _faceAxisVectors,
-         ConstMemoryView<math::Float4> _permutedVertices) :
-         edgeAxisVectors(_edgeAxisVectors),
-         faceAxisVectors(_faceAxisVectors),
-         permutedVertices(_permutedVertices)
-      {}
+	// A view into a convex hull, allowing statically or dynamically allocated, varying sizes to be used
+	class ConvexHullView
+	{
+	public:
+		ConvexHullView(
+			ConstMemoryView<math::Float4> _edgeAxisVectors,
+			ConstMemoryView<math::Float4> _faceAxisVectors,
+			ConstMemoryView<math::Float4> _facePlanes,
+			ConstMemoryView<math::Float4> _permutedVertices) :
+			edgeAxisVectors(_edgeAxisVectors),
+			faceAxisVectors(_faceAxisVectors),
+			facePlanes(_facePlanes),
+			permutedVertices(_permutedVertices)
+		{}
 
-      // Edge vectors, stored (XYZ_, XYZ_, XYZ_, ...)
-      // These are stored to generate new edges from the other hull when a test needs to be performed
-      // They need to be in the most optimized state for generating cross products quickly
-      ConstMemoryView<math::Float4> edgeAxisVectors;
+		// Edge vectors, stored (XYZ_, XYZ_, XYZ_, ...)
+		// These are stored to generate new edges from the other hull when a test needs to be performed
+		// They need to be in the most optimized state for generating cross products quickly
+		ConstMemoryView<math::Float4> edgeAxisVectors;
 
-      // Face axis vectors, stored (XYZ_, XYZ_, XYZ_, ...)
-      // these are the vectors that get tested first since they can be generated ahead of time independant of other hulls
-      ConstMemoryView<math::Float4> faceAxisVectors;
+		// Face axis vectors, stored (XYZD, XYZD, XYZD, ...)
+		// these are the vectors that get tested first since they can be generated ahead of time independant of other hulls
+		ConstMemoryView<math::Float4> faceAxisVectors;
 
-      // Permuted vertices, stored (xxxx, yyyy, zzzz, xxxx, yyyy, zzzz, etc...)
-      // These are tested against all the face axes of the two convex hulls
-      // If the narrow phase is to be performed, its tested against the generated edge axes
-      ConstMemoryView<math::Float4> permutedVertices;
-   };
+		// Face planes, not needed for separating axis theorem but can be very handy for performing some early optimizations
+		// We could test if only some of the vertices from one hull are inside the other hull and bypass the SAT test
+		// We could also test if all the vertices of one hull are inside another hull, allowing us to iterate all children nodes and bypass their SAT tests
+		ConstMemoryView<math::Float4> facePlanes;
 
-   inline void FindMinMaxVertices(const math::Float4& axis, const ConstMemoryView<math::Float4>& vertexList, float& min, float& max)
-   {
-      min = FLT_MAX;
-      max = -FLT_MAX;
+		// Permuted vertices, stored (xxxx, yyyy, zzzz, xxxx, yyyy, zzzz, etc...)
+		// These are tested against all the face axes of the two convex hulls
+		// If the narrow phase is to be performed, its tested against the generated edge axes
+		ConstMemoryView<math::Float4> permutedVertices;
+	};
 
-      int numIterations = (vertexList.Count() + 2) / 3;
 
-      math::Float4 axisX = axis.Shuffle<0>();
-      math::Float4 axisY = axis.Shuffle<1>();
-      math::Float4 axisZ = axis.Shuffle<2>();
+	template<int MAX_VERTICES = 8>
+	inline int CountVerticesInsideHull(const ConvexHullView& hull, const ConstMemoryView<math::Float4>& vertexList)
+	{
+		int numIterations = (vertexList.Count() + 2) / 3;
+		int numPlanes = hull.facePlanes.Count();
+		int numInside = 0;
 
-      for (int i = 0; i < numIterations; i++)
-      {
-         // XYZ components permuted into vectors
-         const math::Float4& x = vertexList[i * 3 + 0];
-         const math::Float4& y = vertexList[i * 3 + 1];
-         const math::Float4& z = vertexList[i * 3 + 2];
+		std::array<__m128i, MAX_VERTICES / 4> numPlanesInside;
 
-         // Lets compute the dot products for all 4 at once
-         math::Float4 xx = x.Mul(axisX);
-         math::Float4 yy = y.Mul(axisY);
-         math::Float4 zz = z.Mul(axisZ);
+		__declspec(align(16)) int int1V[4] = { 1, 1, 1, 1 };
+		__m128i int1 = _mm_load_si128((__m128i*)int1V);
 
-         // Sum them up
-         math::Float4 sum = xx.Add(yy).Add(zz);
+		__declspec(align(16)) int numPlanesV[4] = { numPlanes, numPlanes, numPlanes, numPlanes };
+		__m128i compare = _mm_load_si128((__m128i*)numPlanesV);
 
-         math::Float4::Components components = sum.SplitComponents();
+		__declspec(align(16)) int zeroV[4] = { 0, 0, 0, 0 };
+		__m128i zero = _mm_load_si128((__m128i*)zeroV);
 
-         //int numVertices = std::min(4, vertexList.Count() - i * 4);
-         for (int j = 0; j < 4; j++)
-         {
-            min = std::min(components[j], min);
-            max = std::max(components[j], max);
-         }
-      }
-   }
+		for (int i = 0; i < numIterations; i++)
+		{
+			numPlanesInside[i] = zero;
+		}
 
-   inline bool IntersectsWith(const ConvexHullView& hullA, const ConvexHullView& hullB, bool performEdgeTests)
-   {
-      // First test all of the plane axes since these planes are already precalculated
-      // If we can conclude separation here then we get to early out
-      
-      // Plane axis separation
-      for (int i = 0; i < 2; i++)
-      {
-         const auto& axisList = (i == 0) ? hullA.faceAxisVectors : hullB.faceAxisVectors;
-         for (const auto& axis : axisList)
-         {
-            float minA, maxA;
-            FindMinMaxVertices(axis, hullA.permutedVertices, minA, maxA);
+		for (int p = 0; p < numPlanes; p++)
+		{
+			// Permute the planes
+			math::Float4 planeX = hull.facePlanes[p].Shuffle<0>();
+			math::Float4 planeY = hull.facePlanes[p].Shuffle<1>();
+			math::Float4 planeZ = hull.facePlanes[p].Shuffle<2>();
+			math::Float4 planeD = hull.facePlanes[p].Shuffle<3>();
 
-            float minB, maxB;
-            FindMinMaxVertices(axis, hullB.permutedVertices, minB, maxB);
+			for (int i = 0; i < numIterations; i++)
+			{
+				// XYZ components permuted into vectors
+				const math::Float4& x = vertexList[i * 3 + 0];
+				const math::Float4& y = vertexList[i * 3 + 1];
+				const math::Float4& z = vertexList[i * 3 + 2];
 
-            // Test for separation
-            if (minB > maxA || minA > maxB)
-            {
-               return false;
-            }
-         }
-      }
+				math::Float4 xx = x.Mul(planeX);
+				math::Float4 yy = y.Mul(planeY);
+				math::Float4 zz = z.Mul(planeZ);
+				math::Float4 dots = xx.Add(yy).Add(zz);
+				math::Float4 distances = dots.Sub(planeD);
 
-      if (performEdgeTests)
-      {
-         // Cross each axis against each axis, generate a new axis then add them to the list
-         // Axes are quantized before they are hashed so we can eliminate 'close enough' duplicates
-         for (int i = 0; i < hullA.edgeAxisVectors.Count(); i++)
-         {
-            for (int j = 0; j < hullB.edgeAxisVectors.Count(); j++)
-            {
-               math::Float4 axis = hullA.edgeAxisVectors[i].Cross(hullB.edgeAxisVectors[j]);
+				// Compare distances less than zero
+				__m128i lt = _mm_castps_si128(_mm_cmplt_ps(distances.m, _mm_setzero_ps()));
 
-               float minA, maxA;
-               FindMinMaxVertices(axis, hullA.permutedVertices, minA, maxA);
+				__m128i result = _mm_and_si128(lt, int1);
+				numPlanesInside[i] = _mm_add_epi32(numPlanesInside[i], result);
+			}
+		}
 
-               float minB, maxB;
-               FindMinMaxVertices(axis, hullB.permutedVertices, minB, maxB);
+		__m128i cmpResult = zero;
 
-               // Test for separation
-               if (minB > maxA || minA > maxB)
-               {
-                  return false;
-               }
-            }
-         }
-      }
+		for (int i = 0; i < numIterations; i++)
+		{
+			cmpResult = _mm_add_epi32(cmpResult, _mm_and_si128(int1, _mm_cmpeq_epi32(compare, numPlanesInside[i])));
+		}
 
-      return true;
-   }
+		__declspec(align(16)) int cmpResultV[4];
+		_mm_store_si128((__m128i*)cmpResultV, cmpResult);
 
-   // USE_NEAR_AND_FAR_PLANES allows for an optimization, see bellow
-   template<bool USE_NEAR_AND_FAR_PLANES>
-   struct FrustumConvexHull
-   {
-      ConvexHullView GetView() const
-      {
-         return ConvexHullView(
-            ConstMemoryView<math::Float4>(edgeAxisVectors, 4 + (int)USE_NEAR_AND_FAR_PLANES * 2),
-            ConstMemoryView<math::Float4>(faceAxisVectors, 4 + (int)USE_NEAR_AND_FAR_PLANES * 2),
-            ConstMemoryView<math::Float4>(permutedVertices, 6)
-         );
-      }
+		numInside += cmpResultV[0];
+		numInside += cmpResultV[1];
+		numInside += cmpResultV[2];
+		numInside += cmpResultV[3];
 
-      // User must provide a valid inverse projection view matrix
-      void InitializeFromProjectionMatrix(const math::Matrix4& inverseViewProjectionMatrix4x4)
-      {
-         // Compute the 8 corners of the frustum
-         math::Float4 corners[8]
-         {
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, -1, +0.01f, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, -1, +0.01f, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, +1, +0.01f, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, +1, +0.01f, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, -1, +1, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, -1, +1, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, +1, +1, 1)),
-            inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, +1, +1, 1)),
-         };
+		return numInside;
+	}
 
-         math::Float4::Components sc[8];
+	inline void FindMinMaxVertices(const math::Float4& axis, const ConstMemoryView<math::Float4>& vertexList, float& min, float& max)
+	{
+		min = FLT_MAX;
+		max = -FLT_MAX;
 
-         // Perspective divide, (XYZW / W)
-         for (int i = 0; i < 8; i++)
-         {
-            math::Float4 W = corners[i].Shuffle<3>();
-            corners[i] = corners[i].Div(W);
-            cornerPositions[i] = corners[i];
+		int numIterations = (vertexList.Count() + 2) / 3;
 
-            sc[i] = corners[i].SplitComponents();
-         }
+		math::Float4 axisX = axis.Shuffle<0>();
+		math::Float4 axisY = axis.Shuffle<1>();
+		math::Float4 axisZ = axis.Shuffle<2>();
 
-         // Compute the edge axis vectors along the frustum Z axis
-         edgeAxisVectors[0] = corners[4].Sub(corners[0]);
-         edgeAxisVectors[1] = corners[5].Sub(corners[1]);
-         edgeAxisVectors[2] = corners[6].Sub(corners[2]);
-         edgeAxisVectors[3] = corners[7].Sub(corners[3]);
+		for (int i = 0; i < numIterations; i++)
+		{
+			// XYZ components permuted into vectors
+			const math::Float4& x = vertexList[i * 3 + 0];
+			const math::Float4& y = vertexList[i * 3 + 1];
+			const math::Float4& z = vertexList[i * 3 + 2];
 
-         math::Float4 nearX = corners[1].Sub(corners[0]);
-         math::Float4 nearY = corners[2].Sub(corners[0]);
+			// Lets compute the dot products for all 4 at once
+			math::Float4 xx = x.Mul(axisX);
+			math::Float4 yy = y.Mul(axisY);
+			math::Float4 zz = z.Mul(axisZ);
 
-         // Stash the near XY vectors if we need them later
-         if (USE_NEAR_AND_FAR_PLANES)
-         {
-            // Compute the optional edge axis vectors for the near/far plane X/Y axis
-            edgeAxisVectors[4] = nearX;
-            edgeAxisVectors[5] = nearY;
-         }
+			// Sum them up
+			math::Float4 sum = xx.Add(yy).Add(zz);
 
-         // The 4 normals for the 
-         faceAxisVectors[0] = edgeAxisVectors[0].Cross(nearX);
-         faceAxisVectors[1] = edgeAxisVectors[0].Cross(nearY);
-         faceAxisVectors[2] = edgeAxisVectors[3].Cross(nearX);
-         faceAxisVectors[3] = edgeAxisVectors[3].Cross(nearY);
+			math::Float4::Components components = sum.SplitComponents();
 
-         // Compute optional near/far plane axis
-         if (USE_NEAR_AND_FAR_PLANES)
-         {
-            faceAxisVectors[4] = nearX.Cross(nearY);
-         }
+			//int numVertices = std::min(4, vertexList.Count() - i * 4);
+			for (int j = 0; j < 4; j++)
+			{
+				min = std::min(components[j], min);
+				max = std::max(components[j], max);
+			}
+		}
+	}
 
-         // Set 1 (Near vertices)
-         permutedVertices[0] = math::Float4(sc[0].x, sc[1].x, sc[2].x, sc[3].x); // XXXX
-         permutedVertices[1] = math::Float4(sc[0].y, sc[1].y, sc[2].y, sc[3].y); // YYYY
-         permutedVertices[2] = math::Float4(sc[0].z, sc[1].z, sc[2].z, sc[3].z); // ZZZZ
+	inline bool IntersectsWith(const ConvexHullView& hullA, const ConvexHullView& hullB, bool performEdgeTests)
+	{
+		// First test all of the plane axes since these planes are already precalculated
+		// If we can conclude separation here then we get to early out
 
-         // Set 2 (Far vertices)
-         permutedVertices[3] = math::Float4(sc[4].x, sc[5].x, sc[6].x, sc[7].x); // XXXX
-         permutedVertices[4] = math::Float4(sc[4].y, sc[5].y, sc[6].y, sc[7].y); // YYYY
-         permutedVertices[5] = math::Float4(sc[4].z, sc[5].z, sc[6].z, sc[7].z); // ZZZZ
-      }
+		// Plane axis separation
+		for (int i = 0; i < 2; i++)
+		{
+			const auto& axisList = (i == 0) ? hullA.faceAxisVectors : hullB.faceAxisVectors;
+			for (const auto& axis : axisList)
+			{
+				float minA, maxA;
+				FindMinMaxVertices(axis, hullA.permutedVertices, minA, maxA);
 
-      math::Float4 cornerPositions[8];
+				float minB, maxB;
+				FindMinMaxVertices(axis, hullB.permutedVertices, minB, maxB);
 
-      // For a regular frustum, 4 edge axes are needed for the edges of the view along the Z axis
-      // Another optional 2 are needed for the near and far plane X axis and Y axis since they will be the same
-      math::Float4 edgeAxisVectors[4 + (int)USE_NEAR_AND_FAR_PLANES * 2];
+				// Test for separation
+				if (minB > maxA || minA > maxB)
+				{
+					return false;
+				}
+			}
+		}
 
-      // Frustum will need up to 5 face axes, this is because near and far planes will be the same, just opposites
-      // however as an optimization we can omit the near and far planes giving us a total of 4 planes
-      // This will result in less accurate culling for things that are far away, 
-      // but if we know that the far plane is further away than anything we can see then this is safe to do
-      // For this to work correctly the matrix supplied to initialize must have a far plane further than any leaf node
-      math::Float4 faceAxisVectors[4 + (int)USE_NEAR_AND_FAR_PLANES];
+		if (performEdgeTests)
+		{
+			// Cross each axis against each axis, generate a new axis then add them to the list
+			// Axes are quantized before they are hashed so we can eliminate 'close enough' duplicates
+			for (int i = 0; i < hullA.edgeAxisVectors.Count(); i++)
+			{
+				for (int j = 0; j < hullB.edgeAxisVectors.Count(); j++)
+				{
+					math::Float4 axis = hullA.edgeAxisVectors[i].Cross(hullB.edgeAxisVectors[j]);
 
-      // 8 vertices, 4 per register and 3 components per vector
-      // (8 / 4) * 3 == 6
-      math::Float4 permutedVertices[6];
-   };
+					float minA, maxA;
+					FindMinMaxVertices(axis, hullA.permutedVertices, minA, maxA);
 
-   // Specialization for AABB convex hulls, we can abuse certain properties and cutdown on storage requirements significantly
-   struct AABBConvexHullStorage
-   {
-      ConvexHullView GetView() const
-      {
-         // There is a total of 3 edges with unique axes, and a total of 3 face axes, and they happen to be the same
-         // And since they are axis aligned they will always be the same, so we can cheat here and collapse them all into the same static memory
-         return ConvexHullView(
-            ConstMemoryView<math::Float4>(math::AXES_VECTORS, 3),
-            ConstMemoryView<math::Float4>(math::AXES_VECTORS, 3),
-            ConstMemoryView<math::Float4>(permutedVertices, 6)
-         );
-      }
+					float minB, maxB;
+					FindMinMaxVertices(axis, hullB.permutedVertices, minB, maxB);
 
-      // 8 vertices, 4 per register and 3 components per vector
-      // (8 / 4) * 3 == 6
-      math::Float4 permutedVertices[6];
-   };
+					// Test for separation
+					if (minB > maxA || minA > maxB)
+					{
+						return false;
+					}
+				}
+			}
+		}
+
+		return true;
+	}
+
+	// USE_NEAR_AND_FAR_PLANES allows for an optimization, see bellow
+	template<bool USE_NEAR_AND_FAR_PLANES>
+	struct FrustumConvexHull
+	{
+		ConvexHullView GetView() const
+		{
+			return ConvexHullView(
+				ConstMemoryView<math::Float4>(edgeAxisVectors, 4 + (int)USE_NEAR_AND_FAR_PLANES * 2),
+				ConstMemoryView<math::Float4>(faceAxisVectors, 4 + (int)USE_NEAR_AND_FAR_PLANES),
+				ConstMemoryView<math::Float4>(facePlanes, 4 + (int)USE_NEAR_AND_FAR_PLANES * 2),
+				ConstMemoryView<math::Float4>(permutedVertices, 6)
+			);
+		}
+
+		// User must provide a valid inverse projection view matrix
+		void InitializeFromProjectionMatrix(const math::Matrix4& inverseViewProjectionMatrix4x4)
+		{
+			// Compute the 8 corners of the frustum
+			math::Float4 corners[8]
+			{
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, -1, +0.01f, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, -1, +0.01f, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, +1, +0.01f, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, +1, +0.01f, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, -1, +1, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, -1, +1, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(-1, +1, +1, 1)),
+			   inverseViewProjectionMatrix4x4.Multiply(math::Float4(+1, +1, +1, 1)),
+			};
+
+			math::Float4::Components sc[8];
+
+			// Perspective divide, (XYZW / W)
+			for (int i = 0; i < 8; i++)
+			{
+				math::Float4 W = corners[i].Shuffle<3>();
+				corners[i] = corners[i].Div(W);
+				cornerPositions[i] = corners[i];
+
+				sc[i] = corners[i].SplitComponents();
+			}
+
+			// Compute the edge axis vectors along the frustum Z axis
+			edgeAxisVectors[0] = corners[4].Sub(corners[0]);
+			edgeAxisVectors[1] = corners[5].Sub(corners[1]);
+			edgeAxisVectors[2] = corners[6].Sub(corners[2]);
+			edgeAxisVectors[3] = corners[7].Sub(corners[3]);
+
+			math::Float4 nearX = corners[1].Sub(corners[0]);
+			math::Float4 nearY = corners[2].Sub(corners[0]);
+
+			// Stash the near XY vectors if we need them later
+			if (USE_NEAR_AND_FAR_PLANES)
+			{
+				// Compute the optional edge axis vectors for the near/far plane X/Y axis
+				edgeAxisVectors[4] = nearX;
+				edgeAxisVectors[5] = nearY;
+			}
+
+			// The 4 normals for the 
+			faceAxisVectors[0] = edgeAxisVectors[0].Cross(nearX);
+			faceAxisVectors[1] = nearY.Cross(edgeAxisVectors[0]);
+			faceAxisVectors[2] = nearX.Cross(edgeAxisVectors[3]);
+			faceAxisVectors[3] = edgeAxisVectors[3].Cross(nearY);
+			
+			facePlanes[0] = faceAxisVectors[0].Div(sqrt(faceAxisVectors[0].Dot3(faceAxisVectors[0])));
+			facePlanes[1] = faceAxisVectors[1].Div(sqrt(faceAxisVectors[1].Dot3(faceAxisVectors[1])));
+			facePlanes[2] = faceAxisVectors[2].Div(sqrt(faceAxisVectors[2].Dot3(faceAxisVectors[2])));
+			facePlanes[3] = faceAxisVectors[3].Div(sqrt(faceAxisVectors[3].Dot3(faceAxisVectors[3])));
+
+			// Compute optional near/far plane axis
+			if (USE_NEAR_AND_FAR_PLANES)
+			{
+				faceAxisVectors[4] = nearX.Cross(nearY);
+
+				facePlanes[4] = faceAxisVectors[4].Div(sqrt(faceAxisVectors[4].Dot3(faceAxisVectors[4])));
+				facePlanes[5] = facePlanes[4].Mul(-1.0f); // Axis of plane 4 and 5 will be identical except flipped
+			}
+
+			math::Float4::Components c;
+
+			c = facePlanes[0].SplitComponents();
+			facePlanes[0] = math::Float4(c.x, c.y, c.z, facePlanes[0].Dot3(corners[0]));
+
+			c = facePlanes[1].SplitComponents();
+			facePlanes[1] = math::Float4(c.x, c.y, c.z, facePlanes[1].Dot3(corners[0]));
+
+			c = facePlanes[2].SplitComponents();
+			facePlanes[2] = math::Float4(c.x, c.y, c.z, facePlanes[2].Dot3(corners[3]));
+
+			c = facePlanes[3].SplitComponents();
+			facePlanes[3] = math::Float4(c.x, c.y, c.z, facePlanes[3].Dot3(corners[3]));
+
+			// Compute optional near/far plane axis
+			if (USE_NEAR_AND_FAR_PLANES)
+			{
+				c = facePlanes[4].SplitComponents();
+				facePlanes[4] = math::Float4(c.x, c.y, c.z, facePlanes[4].Dot3(corners[0]));
+
+				c = facePlanes[5].SplitComponents();
+				facePlanes[5] = math::Float4(c.x, c.y, c.z, facePlanes[5].Dot3(corners[0]));
+			}
+
+			// Set 1 (Near vertices)
+			permutedVertices[0] = math::Float4(sc[0].x, sc[1].x, sc[2].x, sc[3].x); // XXXX
+			permutedVertices[1] = math::Float4(sc[0].y, sc[1].y, sc[2].y, sc[3].y); // YYYY
+			permutedVertices[2] = math::Float4(sc[0].z, sc[1].z, sc[2].z, sc[3].z); // ZZZZ
+
+			// Set 2 (Far vertices)
+			permutedVertices[3] = math::Float4(sc[4].x, sc[5].x, sc[6].x, sc[7].x); // XXXX
+			permutedVertices[4] = math::Float4(sc[4].y, sc[5].y, sc[6].y, sc[7].y); // YYYY
+			permutedVertices[5] = math::Float4(sc[4].z, sc[5].z, sc[6].z, sc[7].z); // ZZZZ
+		}
+
+		// Cached frustum corners, useful for debug drawing the frustum
+		math::Float4 cornerPositions[8];
+
+		// For a regular frustum, 4 edge axes are needed for the edges of the view along the Z axis
+		// Another optional 2 are needed for the near and far plane X axis and Y axis since they will be the same
+		math::Float4 edgeAxisVectors[4 + (int)USE_NEAR_AND_FAR_PLANES * 2];
+
+		// Frustum will need up to 5 face axes, this is because near and far planes will be the same, just opposites
+		// however as an optimization we can omit the near and far planes giving us a total of 4 planes
+		// This will result in less accurate culling for things that are far away, 
+		// but if we know that the far plane is further away than anything we can see then this is safe to do
+		// For this to work correctly the matrix supplied to initialize must have a far plane further than any leaf node
+		math::Float4 faceAxisVectors[4 + (int)USE_NEAR_AND_FAR_PLANES];
+
+		// Face planes, the planes normals XYZ and distance W 
+		math::Float4 facePlanes[4 + (int)USE_NEAR_AND_FAR_PLANES * 2];
+
+		// 8 vertices, 4 per register and 3 components per vector
+		// (8 / 4) * 3 == 6
+		math::Float4 permutedVertices[6];
+	};
+
+	// Specialization for AABB convex hulls, we can abuse certain properties and cutdown on storage requirements significantly
+	struct AABBConvexHullStorage
+	{
+		ConvexHullView GetView() const
+		{
+			// There is a total of 3 edges with unique axes, and a total of 3 face axes, and they happen to be the same
+			// And since they are axis aligned they will always be the same, so we can cheat here and collapse them all into the same static memory
+			return ConvexHullView(
+				ConstMemoryView<math::Float4>(math::AXES_VECTORS, 3),
+				ConstMemoryView<math::Float4>(math::AXES_VECTORS, 3),
+				ConstMemoryView<math::Float4>(nullptr, 0), // No faces provided by AABB
+				ConstMemoryView<math::Float4>(permutedVertices, 6)
+			);
+		}
+
+		// 8 vertices, 4 per register and 3 components per vector
+		// (8 / 4) * 3 == 6
+		math::Float4 permutedVertices[6];
+	};
 
 	struct AABB
 	{
@@ -636,73 +817,75 @@ namespace bvh
 			return out;
 		}
 
-      // Returns true if this fully contains containee
-      bool Contains(const AABB& containee)
-      {
-         __m128i lt = _mm_castps_si128(_mm_cmplt_ps(containee.min.m, min.m));
-         __m128i gt = _mm_castps_si128(_mm_cmpgt_ps(containee.max.m, max.m));
-         __m128i one = _mm_set1_epi32(0xFFFFFFFF);
+		// Returns true if this fully contains containee
+		bool Contains(const AABB& containee)
+		{
+			__m128i lt = _mm_castps_si128(_mm_cmplt_ps(containee.min.m, min.m));
+			__m128i gt = _mm_castps_si128(_mm_cmpgt_ps(containee.max.m, max.m));
+			__m128i one = _mm_set1_epi32(0xFFFFFFFF);
 
-         int r0 = _mm_test_all_zeros(lt, one);
-         int r1 = _mm_test_all_zeros(gt, one);
+			int r0 = _mm_test_all_zeros(lt, one);
+			int r1 = _mm_test_all_zeros(gt, one);
 
-         return r0 != 0 && r1 != 0;
-      }
+			return r0 != 0 && r1 != 0;
+		}
 
-      float ComputeVolume() const
-      {
-         math::Float4 extents = max.Sub(min);
-         math::Float4::Components components = extents.SplitComponents();
-         return components.x * components.y * components.z;
-      }
+		float ComputeVolume() const
+		{
+			math::Float4 extents = max.Sub(min);
+			math::Float4::Components components = extents.SplitComponents();
+			return components.x * components.y * components.z;
+		}
 
-      float ComputeSurfaceArea() const
-      {
-         math::Float4 extents = max.Sub(min);
-         math::Float4::Components c = extents.SplitComponents();
-         return 2 * (c.x * c.y + c.y * c.z + c.z * c.x);
-      }
+		float ComputeSurfaceArea() const
+		{
+			math::Float4 extents = max.Sub(min);
+			math::Float4 rotated = extents.Shuffle<1, 2, 0, 0>();
 
-      float ComputeCostHeuristic() const 
-      {
-         return ComputeSurfaceArea();
-      }
+			math::Float4::Components c = extents.Mul(rotated).SplitComponents();
+			return 2 * (c.x + c.y + c.z);
+		}
+
+		float ComputeCostHeuristic() const
+		{
+			return ComputeSurfaceArea();
+		}
 
 		math::Float4 ComputeCenter() const
 		{
 			return min.Add(max).Mul(math::HALF);
 		}
 
-      // Precompute convex hull optimized storage
-      AABBConvexHullStorage ComputeConvexHullStorage() const
-      {
-         auto smin = min.SplitComponents();
-         auto smax = max.SplitComponents();
+		// Precompute convex hull optimized storage
+		AABBConvexHullStorage ComputeConvexHullStorage() const
+		{
+			auto smin = min.SplitComponents();
+			auto smax = max.SplitComponents();
 
-         AABBConvexHullStorage ret;
+			AABBConvexHullStorage ret;
 
-         // Set 1 (top 4 vertices)
-         ret.permutedVertices[0] = math::Float4(smin.x, smax.x, smin.x, smax.x); // XXXX
-         ret.permutedVertices[1] = math::Float4(smin.y, smin.y, smin.y, smin.y); // YYYY
-         ret.permutedVertices[2] = math::Float4(smin.z, smin.z, smax.z, smax.z); // ZZZZ
+			// Set 1 (top 4 vertices)
+			ret.permutedVertices[0] = math::Float4(smin.x, smax.x, smin.x, smax.x); // XXXX
+			ret.permutedVertices[1] = math::Float4(smin.y, smin.y, smin.y, smin.y); // YYYY
+			ret.permutedVertices[2] = math::Float4(smin.z, smin.z, smax.z, smax.z); // ZZZZ
 
-         // Set 2 (bottom 4 vertices)
-         ret.permutedVertices[3] = math::Float4(smin.x, smax.x, smin.x, smax.x); // XXXX
-         ret.permutedVertices[4] = math::Float4(smax.y, smax.y, smax.y, smax.y); // YYYY
-         ret.permutedVertices[5] = math::Float4(smin.z, smin.z, smax.z, smax.z); // ZZZZ
+			// Set 2 (bottom 4 vertices)
+			ret.permutedVertices[3] = math::Float4(smin.x, smax.x, smin.x, smax.x); // XXXX
+			ret.permutedVertices[4] = math::Float4(smax.y, smax.y, smax.y, smax.y); // YYYY
+			ret.permutedVertices[5] = math::Float4(smin.z, smin.z, smax.z, smax.z); // ZZZZ
 
-         return ret;
-      }
+			return ret;
+		}
 
 		math::Float4 min;
 		math::Float4 max;
 	};
 
-   class DrawInterface
-   {
-   public:
-      virtual void DrawBounds(const AABB& bounds, const AABB& parentBounds, int nodeId, int depth, bool isLeaf, bool isTrueBounds) const = 0;
-   };
+	class DrawInterface
+	{
+	public:
+		virtual void DrawBounds(const AABB& bounds, const AABB& parentBounds, int nodeId, int depth, bool isLeaf, bool isTrueBounds) const = 0;
+	};
 
 	template<typename UserDataType = uintptr_t, typename IndexType = unsigned short>
 	class BVH3D
@@ -719,54 +902,63 @@ namespace bvh
 
 		typedef void(*QueryCallbackFunc)(const UserDataType&, const AABB& bounds, void* user);
 
-      struct QueryStats
-      {
-         int failedIntersections = 0;
-         int successfulIntersections = 0;
-         int leafCount = 0;
-      };
+		struct QueryStats
+		{
+			int failedSATIntersections = 0;
+			int successfulSATIntersections = 0;
+			int numVIHTests = 0;
+			int separatingAxisTheoremSkipped = 0;
+			int intersectionsBypassed = 0;
+			int totalNodesVisited = 0;
 
-      struct HandleData
-      {
-         IndexType node;
-         AABB originalBounds;
-         UserDataType userData;
-      };
+			double totalVIHTime = 0;
+			double totalSATTime = 0;
 
-      struct Node
-      {
-         IndexType parent;
-         IndexType child0;
-         IndexType child1;
-         IndexType handleIndex;
-         AABB bounds;
+			int leafCount = 0;
+		};
 
-         bool isLeaf() const
-         {
-            if (child0 == INVALID_INDEX_VALUE)
-            {
-               BVH_ASSERT(child1 == INVALID_INDEX_VALUE);
-               return true;
-            }
+		struct HandleData
+		{
+			IndexType node;
+			AABB originalBounds;
+			UserDataType userData;
+		};
 
-            return false;
-         }
+		struct Node
+		{
+			IndexType parent;
+			IndexType child0;
+			IndexType child1;
+			IndexType handleIndex;
+			AABB bounds;
+			float cost;
+
+			bool isLeaf() const
+			{
+				if (child0 == INVALID_INDEX_VALUE)
+				{
+					BVH_ASSERT(child1 == INVALID_INDEX_VALUE);
+					return true;
+				}
+
+				return false;
+			}
 
 #if USE_VALIDATION
 			bool isDead;
 #endif
 		};
 
-		BVH3D(int maxExpectedEntries = 0) 
+		BVH3D(int maxExpectedEntries = 0)
 		{
 			// Need double the number of maximum expected entries to support the branch nodes
 			mNodes.reserve(maxExpectedEntries * 2);
 			mHandles.reserve(maxExpectedEntries);
 		}
 
-		~BVH3D() 
-      {
-      }
+		~BVH3D()
+		{
+		}
 
 		// Insert user data with a bounding volume into the structure, returns a handle
 		Handle Insert(const AABB& bounds)
@@ -777,69 +969,67 @@ namespace bvh
 				return INVALID_HANDLE;
 			}
 
-         Handle handle = AllocateHandle();
+			Handle handle = AllocateHandle();
 
-         // Doubly linked handle
-         mHandles[handle.id].originalBounds = bounds;
+			// Doubly linked handle
+			mHandles[handle.id].originalBounds = bounds;
 
-         mHandles[handle.id].node = index;
-         mNodes[index].handleIndex = handle.id;
+			mHandles[handle.id].node = index;
+			mNodes[index].handleIndex = handle.id;
 
 			return handle;
 		}
 
 		void Update(Handle handle, const AABB& newBounds)
 		{
-         BVH_ASSERT(handle.id != INVALID_HANDLE.id);
+			BVH_ASSERT(handle.id != INVALID_HANDLE.id);
 
-         // Reallocate the internal index
-         IndexType index = mHandles[handle.id].node;
+			// Reallocate the internal index
+			IndexType index = mHandles[handle.id].node;
 
-         auto& node = mNodes[index];
+			auto& node = mNodes[index];
 
-         // No change needed
-         if (node.bounds.Contains(newBounds))
-         {
-            // Update the bounds
-            mHandles[handle.id].originalBounds = newBounds;
-            return;
-         }
+			// No change needed
+			if (node.bounds.Contains(newBounds))
+			{
+				// Update the bounds
+				mHandles[handle.id].originalBounds = newBounds;
+				return;
+			}
 
+			math::Float4 minVel = newBounds.min.Sub(mHandles[handle.id].originalBounds.min);
+			math::Float4 maxVel = newBounds.max.Sub(mHandles[handle.id].originalBounds.max);
 
+			static int cycle = 0;
+			float advance = 8.0f + (cycle++ % 4);
+			AABB predictedAABB = AABB(
+				newBounds.min.Add(minVel.Mul(advance)),
+				newBounds.max.Add(maxVel.Mul(advance)));
 
-         math::Float4 minVel = newBounds.min.Sub(mHandles[handle.id].originalBounds.min);
-         math::Float4 maxVel = newBounds.max.Sub(mHandles[handle.id].originalBounds.max);
+			AABB expandedBounds = predictedAABB.ComputeMerged(newBounds);
 
-         static int cycle = 0;
-         float advance = 8.0f + (cycle++ % 4);
-         AABB predictedAABB = AABB(
-            newBounds.min.Add(minVel.Mul(advance)),
-            newBounds.max.Add(maxVel.Mul(advance)));
+			// Grab the user data and store it locally
+			IndexType handleIndex = node.handleIndex;
 
-         AABB expandedBounds = predictedAABB.ComputeMerged(newBounds);
+			// Remove the old index
+			RemoveFromBVH(index);
 
-         // Grab the user data and store it locally
-         IndexType handleIndex = node.handleIndex;
+			// Reinsert the user data and get the new index
+			IndexType newIndex = InsertIntoBVH(expandedBounds);
 
-         // Remove the old index
-         RemoveFromBVH(index);
+			mNodes[newIndex].handleIndex = handleIndex;
 
-         // Reinsert the user data and get the new index
-         IndexType newIndex = InsertIntoBVH(expandedBounds);
-
-         mNodes[newIndex].handleIndex = handleIndex;
-
-         // Remap the handle to the new indexs
-         mHandles[handle.id].originalBounds = newBounds;
-         mHandles[handle.id].node = newIndex;
+			// Remap the handle to the new indexs
+			mHandles[handle.id].originalBounds = newBounds;
+			mHandles[handle.id].node = newIndex;
 		}
 
 		// Remove leaf entry
 		void Remove(Handle handle)
 		{
-         // Unlink the handle from the node
-         mNodes[mHandles[handle.id].node].handleIndex = INVALID_INDEX_VALUE;
-         mHandles[handle.id].node = INVALID_INDEX_VALUE;
+			// Unlink the handle from the node
+			mNodes[mHandles[handle.id].node].handleIndex = INVALID_INDEX_VALUE;
+			mHandles[handle.id].node = INVALID_INDEX_VALUE;
 
 			RemoveFromBVH(mHandles[handle.id].node);
 			ReleaseHandle(handle);
@@ -865,169 +1055,175 @@ namespace bvh
 
 
 
-      // Reorganizes the internal memory layout to optimize for query traversal
-      void Optimize()
-      {
-         OptimizeInternal();
-      }
+		// Reorganizes the internal memory layout to optimize for query traversal
+		void Optimize()
+		{
+			OptimizeInternal();
+		}
 
 
-      // Rebuild the structure of the BVH to optimize for queries
-      // This may be important after loading a level or something
-      void Rebuild()
-      {
-         std::vector<IndexType> leafNodes;
-         leafNodes.reserve(mNodes.size());
+		// Rebuild the structure of the BVH to optimize for queries
+		// This may be important after loading a level or something
+		void Rebuild()
+		{
+			std::vector<IndexType> leafNodes;
+			leafNodes.reserve(mNodes.size());
 
-         struct Range
-         {
-            IndexType rangeBegin;
-            IndexType rangeEnd;
-            IndexType node;
-         };
+			struct Range
+			{
+				IndexType rangeBegin;
+				IndexType rangeEnd;
+				IndexType node;
+			};
 
-         std::vector<Range> pendingRanges;
-         pendingRanges.reserve(mNodes.size());
+			std::vector<Range> pendingRanges;
+			pendingRanges.reserve(mNodes.size());
 
-         // Release all non leaf nodes and find the indices for all leaf nodes
-         for (IndexType i = 0; i < mNodes.size(); i++)
-         {
-            if (!mNodes[i].isLeaf())
-            {
-               ReleaseNode(i);
-            }
-            else
-            {
-               leafNodes.push_back(i);
-            }
-         }
+			// Release all non leaf nodes and find the indices for all leaf nodes
+			for (IndexType i = 0; i < mNodes.size(); i++)
+			{
+				if (!mNodes[i].isLeaf())
+				{
+					ReleaseNode(i);
+				}
+				else
+				{
+					leafNodes.push_back(i);
+				}
+			}
 
-         // TODO handle the case when there is only 1 node?
+			// TODO handle the case when there is only 1 node?
 
-         auto computeRangeBounds = [&](IndexType rangeBegin, IndexType rangeEnd) -> AABB
-         {
-            math::Float4 min = math::LARGEST_POSITIVE;
-            math::Float4 max = math::LARGEST_NEGATIVE;
+			auto computeRangeBounds = [&](IndexType rangeBegin, IndexType rangeEnd) -> AABB
+			{
+				math::Float4 min = math::LARGEST_POSITIVE;
+				math::Float4 max = math::LARGEST_NEGATIVE;
 
-            for (IndexType i = rangeBegin; i < rangeEnd; i++)
-            {
-               min = mNodes[leafNodes[i]].bounds.min.Min(min);
-               max = mNodes[leafNodes[i]].bounds.max.Max(max);
-            }
+				for (IndexType i = rangeBegin; i < rangeEnd; i++)
+				{
+					min = mNodes[leafNodes[i]].bounds.min.Min(min);
+					max = mNodes[leafNodes[i]].bounds.max.Max(max);
+				}
 
-            return AABB(min, max);
-         };
+				return AABB(min, max);
+			};
 
-         Range rootRange;
-         rootRange.rangeBegin = (IndexType)0;
-         rootRange.rangeEnd = (IndexType)leafNodes.size();
-         rootRange.node = AllocateNode(computeRangeBounds(rootRange.rangeBegin, rootRange.rangeEnd));
-         mRootIndex = rootRange.node;
+			Range rootRange;
+			rootRange.rangeBegin = (IndexType)0;
+			rootRange.rangeEnd = (IndexType)leafNodes.size();
+			rootRange.node = AllocateNode(computeRangeBounds(rootRange.rangeBegin, rootRange.rangeEnd));
+			mRootIndex = rootRange.node;
 
-         // Starting range is the whole thing
-         pendingRanges.push_back(rootRange);
+			// Starting range is the whole thing
+			pendingRanges.push_back(rootRange);
 
-         while (pendingRanges.size())
-         {
-            Range range = pendingRanges.back();
-            pendingRanges.pop_back();
+			while (pendingRanges.size())
+			{
+				Range range = pendingRanges.back();
+				pendingRanges.pop_back();
 
-            math::Float4 min = mNodes[range.node].bounds.min;
-            math::Float4 max = mNodes[range.node].bounds.max;
+				math::Float4 min = mNodes[range.node].bounds.min;
+				math::Float4 max = mNodes[range.node].bounds.max;
 
-            // Measure largest axis
-            math::Float4::Components extents = max.Sub(min).SplitComponents();
+				// Measure largest axis
+				math::Float4::Components extents = max.Sub(min).SplitComponents();
 
-            int largestAxis = 0;
-            if (extents.x > extents.y && extents.x > extents.z)
-            {
-               largestAxis = 0;
-            }
-            else if (extents.y > extents.x && extents.y > extents.z)
-            {
-               largestAxis = 1;
-            }
-            else
-            {
-               largestAxis = 2;
-            }
+				int largestAxis = 0;
+				if (extents.x > extents.y && extents.x > extents.z)
+				{
+					largestAxis = 0;
+				}
+				else if (extents.y > extents.x && extents.y > extents.z)
+				{
+					largestAxis = 1;
+				}
+				else
+				{
+					largestAxis = 2;
+				}
 
-            // Sort by that axis
-            std::sort(leafNodes.begin() + range.rangeBegin, leafNodes.begin() + range.rangeEnd, 
-               [&](IndexType a, IndexType b)
-            {
-               math::Float4 ap = mNodes[a].bounds.max.Add(mNodes[a].bounds.min).Mul(0.5f);
-               math::Float4 bp = mNodes[b].bounds.max.Add(mNodes[b].bounds.min).Mul(0.5f);
-               return ap.SplitComponents()[largestAxis] > bp.SplitComponents()[largestAxis] ? 1 : 0;
-            });
+				// Sort by that axis
+				std::sort(leafNodes.begin() + range.rangeBegin, leafNodes.begin() + range.rangeEnd,
+					[&](IndexType a, IndexType b)
+					{
+						math::Float4 ap = mNodes[a].bounds.max.Add(mNodes[a].bounds.min).Mul(0.5f);
+						math::Float4 bp = mNodes[b].bounds.max.Add(mNodes[b].bounds.min).Mul(0.5f);
+						return ap.SplitComponents()[largestAxis] > bp.SplitComponents()[largestAxis] ? 1 : 0;
+					});
 
-            // Split the leaf nodes in the middle and create two new ranges
-            // If we only have 1 item in each range, that means its a leaf
-            IndexType rangeS = range.rangeBegin;
-            IndexType rangeC = range.rangeBegin + (range.rangeEnd - range.rangeBegin) / 2;
-            IndexType rangeE = range.rangeEnd;
+				// Split the leaf nodes in the middle and create two new ranges
+				// If we only have 1 item in each range, that means its a leaf
+				IndexType rangeS = range.rangeBegin;
+				IndexType rangeC = range.rangeBegin + (range.rangeEnd - range.rangeBegin) / 2;
+				IndexType rangeE = range.rangeEnd;
 
-            BVH_ASSERT((rangeC - rangeS) >= 1);
-            BVH_ASSERT((rangeE - rangeC) >= 1);
+				BVH_ASSERT((rangeC - rangeS) >= 1);
+				BVH_ASSERT((rangeE - rangeC) >= 1);
 
-            // Relationship links
-            IndexType parent = range.node;
-            IndexType child0 = INVALID_INDEX_VALUE;
-            IndexType child1 = INVALID_INDEX_VALUE;
+				// Relationship links
+				IndexType parent = range.node;
+				IndexType child0 = INVALID_INDEX_VALUE;
+				IndexType child1 = INVALID_INDEX_VALUE;
 
-            if ((rangeC - rangeS) > 1)
-            {
-               Range newRange;
-               newRange.rangeBegin = rangeS;
-               newRange.rangeEnd = rangeC;
-               newRange.node = AllocateNode(computeRangeBounds(newRange.rangeBegin, newRange.rangeEnd));
-               child0 = newRange.node;
+				if ((rangeC - rangeS) > 1)
+				{
+					Range newRange;
+					newRange.rangeBegin = rangeS;
+					newRange.rangeEnd = rangeC;
+					newRange.node = AllocateNode(computeRangeBounds(newRange.rangeBegin, newRange.rangeEnd));
+					child0 = newRange.node;
 
-               pendingRanges.push_back(newRange);
-            }
-            else
-            {
-               child0 = leafNodes[rangeS];
-            }
+					pendingRanges.push_back(newRange);
+				}
+				else
+				{
+					child0 = leafNodes[rangeS];
+				}
 
-            if ((rangeE - rangeC) > 1)
-            {
-               Range newRange;
-               newRange.rangeBegin = rangeC;
-               newRange.rangeEnd = rangeE;
-               newRange.node = AllocateNode(computeRangeBounds(newRange.rangeBegin, newRange.rangeEnd));
-               child1 = newRange.node;
+				if ((rangeE - rangeC) > 1)
+				{
+					Range newRange;
+					newRange.rangeBegin = rangeC;
+					newRange.rangeEnd = rangeE;
+					newRange.node = AllocateNode(computeRangeBounds(newRange.rangeBegin, newRange.rangeEnd));
+					child1 = newRange.node;
 
-               pendingRanges.push_back(newRange);
-            }
-            else
-            {
-               child1 = leafNodes[rangeC];
-            }
+					pendingRanges.push_back(newRange);
+				}
+				else
+				{
+					child1 = leafNodes[rangeC];
+				}
 
-            BVH_ASSERT(parent != INVALID_INDEX_VALUE);
-            BVH_ASSERT(child0 != INVALID_INDEX_VALUE);
-            BVH_ASSERT(child1 != INVALID_INDEX_VALUE);
+				BVH_ASSERT(parent != INVALID_INDEX_VALUE);
+				BVH_ASSERT(child0 != INVALID_INDEX_VALUE);
+				BVH_ASSERT(child1 != INVALID_INDEX_VALUE);
 
-            // Establish the links between parent and child
-            mNodes[parent].child0 = child0;
-            mNodes[child0].parent = parent;
+				// Establish the links between parent and child
+				mNodes[parent].child0 = child0;
+				mNodes[child0].parent = parent;
 
-            mNodes[parent].child1 = child1;
-            mNodes[child1].parent = parent;
-         }
-      }
+				mNodes[parent].child1 = child1;
+				mNodes[child1].parent = parent;
+			}
+		}
 
 		void Query(const ConvexHullView& hull, QueryCallbackFunc callback, void* user, QueryStats* stats) const
 		{
-         if (stats)
-         {
-            stats->leafCount = 0;
-            stats->failedIntersections = 0;
-            stats->successfulIntersections = 0;
-         }
+			if (stats)
+			{
+				stats->leafCount = 0;
+				stats->failedSATIntersections = 0;
+				stats->successfulSATIntersections = 0;
+				stats->separatingAxisTheoremSkipped = 0;
+				stats->numVIHTests = 0;
+				stats->intersectionsBypassed = 0;
+				stats->totalNodesVisited = 0;
+				stats->totalSATTime = 0;
+				stats->totalVIHTime = 0;
+			}
 
-			ConvexHullQueryNode(hull, mRootIndex, callback, user, stats);
+			ConvexHullQueryNode(hull, mRootIndex, callback, user, stats, false);
 		}
 
 		void Draw(const DrawInterface* callback)
@@ -1035,22 +1231,22 @@ namespace bvh
 			DrawTree(callback, mRootIndex, 0);
 		}
 
-      float ComputeTotalCost()
-      {
-         float totalCost = 0;
+		float ComputeTotalCost()
+		{
+			float totalCost = 0;
 
-         for (const auto& node : mNodes)
-         {
-            if (node.parent != INVALID_INDEX_VALUE &&
-               node.child0 != INVALID_INDEX_VALUE &&
-               node.child1 != INVALID_INDEX_VALUE)
-            {
-               totalCost += node.bounds.ComputeSurfaceArea();
-            }
-         }
+			for (const auto& node : mNodes)
+			{
+				if (node.parent != INVALID_INDEX_VALUE &&
+					node.child0 != INVALID_INDEX_VALUE &&
+					node.child1 != INVALID_INDEX_VALUE)
+				{
+					totalCost += node.bounds.ComputeSurfaceArea();
+				}
+			}
 
-         return totalCost;
-      }
+			return totalCost;
+		}
 
 	private:
 		Handle AllocateHandle()
@@ -1110,6 +1306,7 @@ The BVH will continue to operate normally until the limit is reached");
 			node.isDead = false;
 #endif
 			node.bounds = bounds;
+			node.cost = bounds.ComputeCostHeuristic();
 
 			return index;
 		}
@@ -1127,99 +1324,158 @@ The BVH will continue to operate normally until the limit is reached");
 			mFreeNodes.push_back(index);
 		}
 
-      float ComputeSiblingCost(const AABB& bounds, IndexType siblingIndex) const
-      {
-         AABB tmpBounds = mNodes[siblingIndex].bounds.ComputeMerged(bounds);
-         float cost = tmpBounds.ComputeCostHeuristic();
+		float ComputeCostDelta(const AABB& bounds, IndexType nodeIndex, float directCost) const
+		{
+			float costBefore = mNodes[nodeIndex].bounds.ComputeCostHeuristic();
+			return directCost - costBefore;
+		}
 
-         IndexType tmp = mNodes[siblingIndex].parent;
-         while (tmp != INVALID_INDEX_VALUE)
-         {
-            float volumeBefore = mNodes[tmp].bounds.ComputeCostHeuristic();
-            float volumeAfter = mNodes[tmp].bounds.ComputeMerged(tmpBounds).ComputeCostHeuristic();
-
-            cost += volumeAfter - volumeBefore;
-            tmp = mNodes[tmp].parent;
-         }
-
-         return cost;
-      }
-
-      float ComputeCostDelta(const AABB& bounds, IndexType nodeIndex) const
-      {
-         float costBefore = mNodes[nodeIndex].bounds.ComputeCostHeuristic();
-         float costAfter = mNodes[nodeIndex].bounds.ComputeMerged(bounds).ComputeCostHeuristic();
-         return costAfter - costBefore;
-      }
-
-      float ComputeDirectCost(const AABB& bounds, IndexType nodeIndex) const
-      {
-         return mNodes[nodeIndex].bounds.ComputeMerged(bounds).ComputeCostHeuristic();
-      }
+		float ComputeDirectCost(const AABB& bounds, IndexType nodeIndex) const
+		{
+			return mNodes[nodeIndex].bounds.ComputeMerged(bounds).ComputeCostHeuristic();
+		}
 
 		IndexType FindBestSibling(const AABB& bounds) const
 		{
-         float bestCost = FLT_MAX;
-         IndexType bestNode = INVALID_INDEX_VALUE;
+			float bestCost = FLT_MAX;
+			IndexType bestNode = INVALID_INDEX_VALUE;
 
-         float boundsCost = bounds.ComputeCostHeuristic();
+			float boundsCost = bounds.ComputeCostHeuristic();
 
-         if (mRootIndex == INVALID_INDEX_VALUE)
-         {
-            return INVALID_INDEX_VALUE;
-         }
+			if (mRootIndex == INVALID_INDEX_VALUE)
+			{
+				return INVALID_INDEX_VALUE;
+			}
 
-         struct Helper
-         {
-            IndexType node;
-            float inheritedCost;
-         };
+			struct Helper
+			{
+				IndexType node;
+				float inheritedCost;
+			};
 
-         std::queue<Helper> priorityQueue;
-         priorityQueue.push({ mRootIndex, 0.0f });
+#if 0
+			std::queue<Helper> priorityQueue;
+			priorityQueue.push({ mRootIndex, 0.0f });
 
-         while (!priorityQueue.empty())
-         {
-            const auto& entry = priorityQueue.front();
+			while (!priorityQueue.empty())
+			{
+				const auto& entry = priorityQueue.front();
 
-            IndexType nodeIndex = entry.node;
-            float inheritedCost = entry.inheritedCost;
-            float directCost = ComputeDirectCost(bounds, nodeIndex);
+				IndexType nodeIndex = entry.node;
+				float inheritedCost = entry.inheritedCost;
+				float directCost = ComputeDirectCost(bounds, nodeIndex);
 
-            priorityQueue.pop();
+				priorityQueue.pop();
 
-            float cost = inheritedCost + directCost;
+				float cost = inheritedCost + directCost;
 
-            if (cost < bestCost)
-            {
-               bestNode = nodeIndex;
-               bestCost = cost;
-            }
+				if (cost < bestCost)
+				{
+					bestNode = nodeIndex;
+					bestCost = cost;
+				}
 
-            if (!mNodes[nodeIndex].isLeaf())
-            {
-               float costDelta = ComputeCostDelta(bounds, nodeIndex);
-               float lowerBoundChildCost = inheritedCost + costDelta + boundsCost;
-               if (lowerBoundChildCost < bestCost)
-               {
-                  priorityQueue.push( { mNodes[nodeIndex].child0, inheritedCost + costDelta } );
-                  priorityQueue.push( { mNodes[nodeIndex].child1, inheritedCost + costDelta } );
-               }
-            }
-         }
+				if (!mNodes[nodeIndex].isLeaf())
+				{
+					float costDelta = ComputeCostDelta(bounds, nodeIndex);
+					float lowerBoundChildCost = inheritedCost + costDelta + boundsCost;
+					if (lowerBoundChildCost < bestCost)
+					{
+						priorityQueue.push({ mNodes[nodeIndex].child0, inheritedCost + costDelta });
+						priorityQueue.push({ mNodes[nodeIndex].child1, inheritedCost + costDelta });
 
-         return bestNode;
+
+						volatile static int maxQueueSize = 0;
+						if (priorityQueue.size() > maxQueueSize)
+						{
+							maxQueueSize = priorityQueue.size();
+
+							char buffer[64];
+							snprintf(buffer, sizeof(buffer), "%i\n", maxQueueSize);
+							OutputDebugStringA(buffer);
+						}
+					}
+				}
+			}
+#endif
+
+			static const int MAX_HELPER_STACK_SIZE = 512;
+			Helper helperStack[MAX_HELPER_STACK_SIZE];
+			int helperCount = 0;
+
+			auto push = [&](const Helper& helper)
+			{
+				helperStack[helperCount] = helper;
+				helperCount += 1;
+				BVH_ASSERT(helperCount < MAX_HELPER_STACK_SIZE);
+			};
+
+			auto pop = [&]()
+			{
+				helperCount -= 1;
+				return helperStack[helperCount];
+			};
+
+			push({ mRootIndex, 0.0f });
+
+			int numIterations = 0;
+			while (helperCount != 0)
+			{
+				numIterations += 1;
+				const auto& entry = pop();
+
+				IndexType nodeIndex = entry.node;
+				float inheritedCost = entry.inheritedCost;
+				float directCost = ComputeDirectCost(bounds, nodeIndex);
+
+				float cost = inheritedCost + directCost;
+
+				if (cost < bestCost)
+				{
+					bestNode = nodeIndex;
+					bestCost = cost;
+				}
+
+				if (!mNodes[nodeIndex].isLeaf())
+				{
+					float costDelta = (directCost - mNodes[nodeIndex].cost);
+					float newCost = inheritedCost + costDelta;
+
+					float lowerBoundChildCost = newCost + boundsCost;
+					if (lowerBoundChildCost < bestCost)
+					{
+						push({ mNodes[nodeIndex].child0, newCost });
+						push({ mNodes[nodeIndex].child1, newCost });
+					}
+				}
+			}
+
+			volatile static int maxQueueSize = 0;
+			if (numIterations > maxQueueSize)
+			{
+				maxQueueSize = numIterations;
+
+				char buffer[64];
+				snprintf(buffer, sizeof(buffer), "%i\n", maxQueueSize);
+				OutputDebugStringA(buffer);
+			}
+
+			return bestNode;
 		}
 
 		void Rotate(IndexType index)
 		{
 			IndexType parentIndex = mNodes[index].parent;
 			if (parentIndex == INVALID_INDEX_VALUE)
+			{
 				return;
+			}
 
 			IndexType grandParentIndex = mNodes[parentIndex].parent;
 			if (grandParentIndex == INVALID_INDEX_VALUE)
+			{
 				return;
+			}
 
 			IndexType uncleIndex = INVALID_INDEX_VALUE;
 			if (mNodes[grandParentIndex].child0 == parentIndex)
@@ -1281,6 +1537,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 				// Refit the original parent
 				mNodes[parentIndex].bounds = tmpBounds;
+				mNodes[parentIndex].cost = costB;
 
 				Validate();
 			}
@@ -1360,6 +1617,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 					AABB combinedChildBounds = mNodes[c0].bounds.ComputeMerged(mNodes[c1].bounds);
 					mNodes[tmp].bounds = combinedChildBounds;
+					mNodes[tmp].cost = combinedChildBounds.ComputeCostHeuristic();
 
 					Rotate(tmp);
 					Validate();
@@ -1439,6 +1697,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 				AABB combinedChildBounds = mNodes[c0].bounds.ComputeMerged(mNodes[c1].bounds);
 				mNodes[tmp].bounds = combinedChildBounds;
+				mNodes[tmp].cost = combinedChildBounds.ComputeCostHeuristic();
 
 				tmp = mNodes[tmp].parent;
 			}
@@ -1451,31 +1710,31 @@ The BVH will continue to operate normally until the limit is reached");
 			if (currentNode == INVALID_INDEX_VALUE)
 				return;
 
-         bool isLeaf = mNodes[currentNode].isLeaf();
+			bool isLeaf = mNodes[currentNode].isLeaf();
 
-         if (mNodes[currentNode].parent != INVALID_INDEX_VALUE)
-         {
-            callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[mNodes[currentNode].parent].bounds, 
-               currentNode, depth, isLeaf, false);
-         }
-         else
-         {
-            callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[currentNode].bounds, 
-               currentNode, depth, isLeaf, false);
-         }
+			if (mNodes[currentNode].parent != INVALID_INDEX_VALUE)
+			{
+				callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[mNodes[currentNode].parent].bounds,
+					currentNode, depth, isLeaf, false);
+			}
+			else
+			{
+				callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[currentNode].bounds,
+					currentNode, depth, isLeaf, false);
+			}
 
-         if (isLeaf)
-         {
-            callbacks->DrawBounds(mHandles[mNodes[currentNode].handleIndex].originalBounds, mHandles[mNodes[currentNode].handleIndex].originalBounds,
-               currentNode, depth, false, true);
-         }
+			if (isLeaf)
+			{
+				callbacks->DrawBounds(mHandles[mNodes[currentNode].handleIndex].originalBounds, mHandles[mNodes[currentNode].handleIndex].originalBounds,
+					currentNode, depth, false, true);
+			}
 
 
 			DrawTree(callbacks, mNodes[currentNode].child0, depth + 1);
 			DrawTree(callbacks, mNodes[currentNode].child1, depth + 1);
 		}
 
-		void ConvexHullQueryNode(const ConvexHullView& hull, IndexType currentNode, QueryCallbackFunc callback, void* user, QueryStats* stats) const
+		void ConvexHullQueryNode(const ConvexHullView& hull, IndexType currentNode, QueryCallbackFunc callback, void* user, QueryStats* stats, bool intersects) const
 		{
 			if (mRootIndex == INVALID_INDEX_VALUE)
 				return;
@@ -1484,114 +1743,182 @@ The BVH will continue to operate normally until the limit is reached");
 
 			const Node& node = mNodes[currentNode];
 
-         AABBConvexHullStorage permutedAABB = node.bounds.ComputeConvexHullStorage();
+			AABBConvexHullStorage permutedAABB = node.bounds.ComputeConvexHullStorage();
 
-         if (IntersectsWith(hull, permutedAABB.GetView(), false))
-         {
-            stats->successfulIntersections++;
+			ConvexHullView aabbView = permutedAABB.GetView();
 
-            if (node.isLeaf())
-            {
-               if (stats)
-               {
-                  stats->leafCount++;
-               }
+			if (stats)
+			{
+				stats->totalNodesVisited++;
+			}
 
-               // Leaf
-               callback(mHandles[node.handleIndex].userData, node.bounds, user);
-            }
-            else
-            {
-               BVH_ASSERT(node.child1 != INVALID_INDEX_VALUE);
-               ConvexHullQueryNode(hull, node.child0, callback, user, stats);
-               ConvexHullQueryNode(hull, node.child1, callback, user, stats);
-            }
-         }
-         else
-         {
-            stats->failedIntersections++;
-         }
+			bool fullyInside = false;
+			if (!intersects)
+			{
+				if (stats)
+				{
+					stats->numVIHTests++;
+				}
+
+				Timer timer;
+
+				int numVerticesInside = CountVerticesInsideHull(hull, aabbView.permutedVertices);
+
+				if (stats)
+				{
+					stats->totalVIHTime += timer.getMicroseconds();
+				}
+
+				if (numVerticesInside > 0)
+				{
+					intersects = true;
+					
+					if (stats)
+					{
+						// By calling true here, it means we skipped 1 SAT test
+						stats->separatingAxisTheoremSkipped++;
+					}
+
+					// Fully inside? we can skip all future tests and just include everything
+					if (numVerticesInside == hull.facePlanes.Count())
+					{
+						fullyInside = true;
+					}
+				}
+			}
+			else
+			{
+				// If we reached here, it means we skipped all intersection tests and we are just bypassing through
+				if (stats)
+				{
+					stats->intersectionsBypassed++;
+				}
+			}
+			
+			if (!intersects)
+			{
+				Timer timer;
+
+				intersects = IntersectsWith(hull, aabbView, false);
+
+				if (stats)
+				{
+					stats->totalSATTime += timer.getMicroseconds();
+				}
+
+				if (stats)
+				{
+					if (intersects)
+					{
+						stats->successfulSATIntersections++;
+					}
+					else
+					{
+						stats->failedSATIntersections++;
+					}
+				}
+			}
+
+			if (intersects)
+			{
+				if (node.isLeaf())
+				{
+					if (stats)
+					{
+						stats->leafCount++;
+					}
+
+					// Leaf
+					callback(mHandles[node.handleIndex].userData, node.bounds, user);
+				}
+				else
+				{
+					BVH_ASSERT(node.child1 != INVALID_INDEX_VALUE);
+					ConvexHullQueryNode(hull, node.child0, callback, user, stats, fullyInside);
+					ConvexHullQueryNode(hull, node.child1, callback, user, stats, fullyInside);
+				}
+			}
 		}
 
-      struct OptimizeHelper
-      {
-         IndexType order;
-         IndexType index;
-      };
+		struct OptimizeHelper
+		{
+			IndexType order;
+			IndexType index;
+		};
 
-      void OptimizeGenerateOrder(std::vector<OptimizeHelper>& data, IndexType nodeIndex, int& counter)
-      {
-         data[nodeIndex].order = counter;
-         counter += 1;
+		void OptimizeGenerateOrder(std::vector<OptimizeHelper>& data, IndexType nodeIndex, int& counter)
+		{
+			data[nodeIndex].order = counter;
+			counter += 1;
 
-         data[nodeIndex].index = nodeIndex;
+			data[nodeIndex].index = nodeIndex;
 
-         if (mNodes[nodeIndex].child0 != INVALID_INDEX_VALUE)
-         {
-            OptimizeGenerateOrder(data, mNodes[nodeIndex].child0, counter);
-         }
+			if (mNodes[nodeIndex].child0 != INVALID_INDEX_VALUE)
+			{
+				OptimizeGenerateOrder(data, mNodes[nodeIndex].child0, counter);
+			}
 
-         if (mNodes[nodeIndex].child1 != INVALID_INDEX_VALUE)
-         {
-            OptimizeGenerateOrder(data, mNodes[nodeIndex].child1, counter);
-         }
-      }
+			if (mNodes[nodeIndex].child1 != INVALID_INDEX_VALUE)
+			{
+				OptimizeGenerateOrder(data, mNodes[nodeIndex].child1, counter);
+			}
+		}
 
-      void OptimizeInternal()
-      {
-         std::vector<OptimizeHelper> data;
-         data.resize(mNodes.size());
+		void OptimizeInternal()
+		{
+			std::vector<OptimizeHelper> data;
+			data.resize(mNodes.size());
 
-         std::vector<int> oldToNewLUT;
-         oldToNewLUT.resize(mNodes.size());
+			std::vector<int> oldToNewLUT;
+			oldToNewLUT.resize(mNodes.size());
 
-         std::vector<Node> newNodes;
-         newNodes.resize(mNodes.size());
+			std::vector<Node> newNodes;
+			newNodes.resize(mNodes.size());
 
-         int counter = 0;
-         OptimizeGenerateOrder(data, mRootIndex, counter);
+			int counter = 0;
+			OptimizeGenerateOrder(data, mRootIndex, counter);
 
-         std::sort(data.begin(), data.end(), [](const OptimizeHelper& a, const OptimizeHelper& b)
-         {
-            return a.order < b.order;
-         });
+			std::sort(data.begin(), data.end(), [](const OptimizeHelper& a, const OptimizeHelper& b)
+				{
+					return a.order < b.order;
+				});
 
-         for (int i = 0; i < data.size(); i++)
-         {
-            oldToNewLUT[data[i].index] = i;
-         }
+			for (int i = 0; i < data.size(); i++)
+			{
+				oldToNewLUT[data[i].index] = i;
+			}
 
-         mRootIndex = oldToNewLUT[mRootIndex];
+			mRootIndex = oldToNewLUT[mRootIndex];
 
-         for (int i = 0; i < data.size(); i++)
-         {
-            IndexType oldIndex = data[i].index;
+			for (int i = 0; i < data.size(); i++)
+			{
+				IndexType oldIndex = data[i].index;
 
-            newNodes[i] = mNodes[oldIndex];
+				newNodes[i] = mNodes[oldIndex];
 
-            if (newNodes[i].parent != INVALID_INDEX_VALUE)
-            {
-               newNodes[i].parent = oldToNewLUT[newNodes[i].parent];
-            }
+				if (newNodes[i].parent != INVALID_INDEX_VALUE)
+				{
+					newNodes[i].parent = oldToNewLUT[newNodes[i].parent];
+				}
 
-            if (newNodes[i].child0 != INVALID_INDEX_VALUE)
-            {
-               newNodes[i].child0 = oldToNewLUT[newNodes[i].child0];
-            }
+				if (newNodes[i].child0 != INVALID_INDEX_VALUE)
+				{
+					newNodes[i].child0 = oldToNewLUT[newNodes[i].child0];
+				}
 
-            if (newNodes[i].child1 != INVALID_INDEX_VALUE)
-            {
-               newNodes[i].child1 = oldToNewLUT[newNodes[i].child1];
-            }
-         }
+				if (newNodes[i].child1 != INVALID_INDEX_VALUE)
+				{
+					newNodes[i].child1 = oldToNewLUT[newNodes[i].child1];
+				}
+			}
 
-         for (int i = 0; i < mHandles.size(); i++)
-         {
-            mHandles[i].node = oldToNewLUT[i];
-         }
+			for (int i = 0; i < mHandles.size(); i++)
+			{
+				mHandles[i].node = oldToNewLUT[i];
+			}
 
-         mNodes = std::move(newNodes);
-      }
+			mNodes = std::move(newNodes);
+		}
 
 		void Validate() const
 		{
