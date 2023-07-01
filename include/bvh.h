@@ -1780,7 +1780,6 @@ The BVH will continue to operate normally until the limit is reached");
 				}
 			}
 
-#if 0
 			if (!intersects)
 			{
 				if (stats)
@@ -1822,7 +1821,6 @@ The BVH will continue to operate normally until the limit is reached");
 					stats->intersectionsBypassed++;
 				}
 			}
-#endif
 
 			if (!intersects)
 			{
