@@ -546,10 +546,10 @@ namespace bvh
 				math::Float4 yy = y.Mul(planeY);
 				math::Float4 zz = z.Mul(planeZ);
 				math::Float4 dots = xx.Add(yy).Add(zz);
-				math::Float4 distances = dots.Sub(planeD);
+				math::Float4 signedDistances = dots.Sub(planeD);
 
-				// Compare distances less than zero
-				__m128i lt = _mm_castps_si128(_mm_cmplt_ps(distances.m, _mm_setzero_ps()));
+				// Compare signedDistances less than zero
+				__m128i lt = _mm_castps_si128(_mm_cmplt_ps(signedDistances.m, _mm_setzero_ps()));
 
 				__m128i result = _mm_and_si128(lt, int1);
 				numPlanesInside[i] = _mm_add_epi32(numPlanesInside[i], result);
@@ -571,7 +571,16 @@ namespace bvh
 		numInside += cmpResultV[2];
 		numInside += cmpResultV[3];
 
-		return numInside;
+		if (numInside == 0)
+		{
+			return 1; // 1 indicates all vertices are ouside
+		}
+		else if (numInside == numIterations * 4)
+		{
+			return -1; // -1 indicates all vertices are inside
+		}
+
+		return 0; // Zero indicates some are inside and outside
 	}
 
 	inline void FindMinMaxVertices(const math::Float4& axis, const ConstMemoryView<math::Float4>& vertexList, float& min, float& max)
@@ -881,7 +890,7 @@ namespace bvh
 
 		math::Float4 ComputeHalfExtents() const
 		{
-			return min.Sub(max).Mul(math::HALF);
+			return max.Sub(min).Mul(math::HALF);
 		}
 
 		// Precompute convex hull optimized storage
@@ -912,7 +921,7 @@ namespace bvh
 	class DrawInterface
 	{
 	public:
-		virtual void DrawBounds(const AABB& bounds, const AABB& parentBounds, int nodeId, int depth, bool isLeaf, bool isTrueBounds) const = 0;
+		virtual void DrawBounds(const AABB& bounds, const math::Float4& color) const = 0;
 	};
 
 	template<typename UserDataType = uintptr_t>
@@ -1242,14 +1251,14 @@ namespace bvh
 			}
 		}
 
-		void Query(const ConvexHullView& hull, QueryCallbackFunc callback, void* user, QueryStats* stats) const
+		void Query(const ConvexHullView& hull, QueryCallbackFunc callback, void* user, QueryStats* stats, DrawInterface* drawInterface) const
 		{
 			if (stats)
 			{
 				*stats = {};
 			}
 
-			ConvexHullQueryNode(hull, mRootIndex, callback, user, stats, false);
+			ConvexHullQueryNode(hull, mRootIndex, callback, user, stats, drawInterface, false);
 		}
 
 		void Draw(const DrawInterface* callback)
@@ -1704,21 +1713,9 @@ The BVH will continue to operate normally until the limit is reached");
 
 			bool isLeaf = mNodes[currentNode].isLeaf();
 
-			if (mNodes[currentNode].parent != INVALID_INDEX_VALUE)
-			{
-				callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[mNodes[currentNode].parent].bounds,
-					currentNode, depth, isLeaf, false);
-			}
-			else
-			{
-				callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[currentNode].bounds,
-					currentNode, depth, isLeaf, false);
-			}
-
 			if (isLeaf)
 			{
-				callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[currentNode].bounds,
-					currentNode, depth, false, true);
+				callbacks->DrawBounds(mNodes[currentNode].bounds, math::Float4(1, 0, 0, 1));
 			}
 
 
@@ -1726,7 +1723,7 @@ The BVH will continue to operate normally until the limit is reached");
 			DrawTree(callbacks, mNodes[currentNode].child1, depth + 1);
 		}
 
-		void ConvexHullQueryNode(const ConvexHullView& hull, IndexType currentNode, QueryCallbackFunc callback, void* user, QueryStats* stats, bool intersects) const
+		void ConvexHullQueryNode(const ConvexHullView& hull, IndexType currentNode, QueryCallbackFunc callback, void* user, QueryStats* stats, DrawInterface* drawInterface, bool fullyInside) const
 		{
 			if (mRootIndex == INVALID_INDEX_VALUE)
 				return;
@@ -1744,7 +1741,7 @@ The BVH will continue to operate normally until the limit is reached");
 				stats->totalNodesVisited++;
 			}
 
-			bool fullyInside = false;
+			bool intersects = false;
 
 			// Perform a very broad approximation of our intersection test by computing a bounding sphere and testing it against our hull
 			// This is the simplest form of intersection we can do, it allows us to reject future tests if its fully outside or fully inside
@@ -1789,28 +1786,35 @@ The BVH will continue to operate normally until the limit is reached");
 
 				Timer timer;
 
-				int numVerticesInside = CountVerticesInsideHull(hull, aabbView.permutedVertices);
+				int r = CountVerticesInsideHull(hull, aabbView.permutedVertices);
 
 				if (stats)
 				{
 					stats->totalVIHTime += timer.getMicroseconds();
 				}
 
-				if (numVerticesInside > 0)
+				if (r > 0)
 				{
-					intersects = true;
-					
+					// All vertices are outside, 
+					// this could be a false positive so we need to continue and do a SAT test
+				}
+				else if (r < 0)
+				{
 					if (stats)
 					{
 						// By calling true here, it means we skipped 1 SAT test
 						stats->separatingAxisTheoremSkipped++;
 					}
 
-					// Fully inside? we can skip all future tests and just include everything
-					if (numVerticesInside == hull.facePlanes.Count())
-					{
-						fullyInside = true;
-					}
+					// Fully inside, If the sphere is fully inside, can bypass all future checks
+					intersects = true;
+					fullyInside = true;
+				}
+				else
+				{
+					// Some vertices are inside, which means SAT is going to pass so we can skip it
+					// However we are not fully inside so we have to continue checking the children
+					intersects = true;
 				}
 			}
 			else
@@ -1855,14 +1859,33 @@ The BVH will continue to operate normally until the limit is reached");
 						stats->leafCount++;
 					}
 
+					if (drawInterface)
+					{
+						drawInterface->DrawBounds(mHandles[node.handleIndex].originalBounds, math::Float4(0, 1, 0, 1));
+						drawInterface->DrawBounds(node.bounds, math::Float4(0, 1, 0, 0.5f));
+					}
+
 					// Leaf
 					callback(mHandles[node.handleIndex].userData, mHandles[node.handleIndex].originalBounds, user);
+
 				}
 				else
 				{
+					if (drawInterface)
+					{
+						if (fullyInside)
+						{
+							drawInterface->DrawBounds(node.bounds, math::Float4(0.2f, 0.2f, 0.9f, 0.9f));
+						}
+						else
+						{
+							drawInterface->DrawBounds(node.bounds, math::Float4(0.3f, 0.3f, 0.3f, 0.1f));
+						}
+					}
+
 					BVH_ASSERT(node.child1 != INVALID_INDEX_VALUE);
-					ConvexHullQueryNode(hull, node.child0, callback, user, stats, fullyInside);
-					ConvexHullQueryNode(hull, node.child1, callback, user, stats, fullyInside);
+					ConvexHullQueryNode(hull, node.child0, callback, user, stats, drawInterface, fullyInside);
+					ConvexHullQueryNode(hull, node.child1, callback, user, stats, drawInterface, fullyInside);
 				}
 			}
 		}

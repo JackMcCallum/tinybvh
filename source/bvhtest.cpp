@@ -283,16 +283,10 @@ void BVH_OnTick()
    class BVHDrawInterface : public bvh::DrawInterface
    {
    public:
-      virtual void DrawBounds(const bvh::AABB& bounds, const bvh::AABB& parentBounds, int id, int depth, bool isLeaf, bool isTrueBounds) const override
+      virtual void DrawBounds(const bvh::AABB& bounds, const math::Float4& color) const override
       {
-         if (isTrueBounds)
-         {
-            ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(1, 0, 0, 1)));
-         }
-         else if (isLeaf)
-         {
-            //ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 0, 1, 1)));
-         }
+        math::Float4::Components c = color.SplitComponents();
+        ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(c.x, c.y, c.z, c.w)));
       }
    };
 
@@ -403,18 +397,20 @@ void BVH_OnTick()
       {
           sBVHTest.Query(frustum.GetView(), [](const MyUser& data, const bvh::AABB& bounds, void* user)
               {
-              }, nullptr, &sBVHStats);
+              }, nullptr, nullptr, nullptr);
       }
 
       timer.stop();
       
       BVHQueryTime = timer.getMiliseconds() / 30.0f;
 
+      BVHDrawInterface drawInterface;
+
       // Query again but this time draw
       sBVHTest.Query(frustum.GetView(), [](const MyUser& data, const bvh::AABB& bounds, void* user)
       {
          ImGui_DebugDrawAABB_SLOW(gCameraMatrices.projViewMatrix, bounds.min, bounds.max, ImGui::GetColorU32(ImVec4(0, 1, 0, 1.0f)));
-      }, nullptr, nullptr);
+      }, nullptr, &sBVHStats, &drawInterface);
 
       timer.start();
 
@@ -435,8 +431,6 @@ void BVH_OnTick()
 
    }
 
-   BVHDrawInterface drawInterface;
-
 
 #if 0
    auto view = (float*)&gRender->getViewD3DMatrix();
@@ -453,6 +447,8 @@ void BVH_OnTick()
 
    if (BVHDraw)
    {
+       BVHDrawInterface drawInterface;
+
       sBVHTest.Draw(&drawInterface);
    }
 
