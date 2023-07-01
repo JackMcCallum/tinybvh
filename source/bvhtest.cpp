@@ -50,8 +50,8 @@ struct Object
 
 std::vector<Object> Objects;
 
-bvh::BVH3D<MyUser, unsigned int> sBVHTest;
-bvh::BVH3D<MyUser, unsigned int>::QueryStats sBVHStats;
+bvh::BVH3D<MyUser> sBVHTest;
+bvh::BVH3D<MyUser>::QueryStats sBVHStats;
 
 FreeCamera gFreeCamera;
 CameraMatrices gCameraMatrices;
@@ -161,6 +161,7 @@ void OnGUI()
    ImGui::Text("Failed SAT Intersections: %i", sBVHStats.failedSATIntersections);
    ImGui::Text("Successful SAT Intersections: %i", sBVHStats.successfulSATIntersections);
    ImGui::Text("VIH Tests: %i", sBVHStats.numVIHTests);
+   ImGui::Text("HSI Tests: %i", sBVHStats.numHSITests);
    ImGui::Text("Leaf Count: %i", sBVHStats.leafCount);
    ImGui::Text("SAT Skipped: %i", sBVHStats.separatingAxisTheoremSkipped);
    ImGui::Text("Insersections Bypassed: %i", sBVHStats.intersectionsBypassed);
@@ -168,6 +169,7 @@ void OnGUI()
 
    ImGui::Text("Total SAT Time: %fus (%fus each)", sBVHStats.totalSATTime, sBVHStats.totalSATTime / (sBVHStats.successfulSATIntersections + sBVHStats.failedSATIntersections));
    ImGui::Text("Total VIH Time: %fus (%fus each)", sBVHStats.totalVIHTime, sBVHStats.totalVIHTime / (sBVHStats.numVIHTests));
+   ImGui::Text("Total HSI Time: %fus (%fus each)", sBVHStats.totalHSITime, sBVHStats.totalHSITime / (sBVHStats.numHSITests));
 
    ImGui::End();
 
@@ -175,7 +177,7 @@ void OnGUI()
 
 void RebuildBVH()
 {
-   sBVHTest = bvh::BVH3D<MyUser, unsigned int>(BVHNumStaticObjects + BVHNumDynamicObjects);
+   sBVHTest = bvh::BVH3D<MyUser>(BVHNumStaticObjects + BVHNumDynamicObjects);
 
    Objects.resize(BVHNumStaticObjects + BVHNumDynamicObjects);
 

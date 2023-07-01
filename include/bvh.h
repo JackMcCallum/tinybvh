@@ -1,16 +1,8 @@
-
 /*
-
 TODO LIST:
-Remove use of Queue, avoid dynamic allocations and instead use stack allocated memory
-Move the user data to the handle list instead, only leaf nodes need it
-Add author to the system, write up the readme and licence stuff
-Fix white space
-Optimize with sphere tests
 Implement ray casts
 Box queries
 Orthographic queries
-
 */
 
 #pragma once
@@ -22,7 +14,7 @@ Orthographic queries
 #include <xmmintrin.h>
 
 #ifndef BVH_ASSERT
-#define BVH_ASSERT(cond, ...) do { if (!(cond)) { printf("ASSERT FAILED: %s", #cond); __debugbreak(); } } while (false)
+#define BVH_ASSERT(cond) do { if (!(cond)) { printf("ASSERT FAILED: %s", #cond); __debugbreak(); } } while (false)
 #endif
 
 #ifndef BVH_ASSERTF
@@ -480,6 +472,37 @@ namespace bvh
 		ConstMemoryView<math::Float4> permutedVertices;
 	};
 
+	// Check if a sphere is fully iside, fully outside, or intersecting with the hull
+	// This is not true sphere/hull accuracy as there will be inaccuracies around edges of the hull
+	inline int HullSphereIntersection(const ConvexHullView& hull, const math::Float4& center, float radius)
+	{
+		int numPlanes = hull.facePlanes.Count();
+
+		int numFullyInside = 0;
+
+		for (int p = 0; p < numPlanes; p++)
+		{
+			float signedDistance = hull.facePlanes[p].Dot3(center) - hull.facePlanes[p].SplitComponents().w;
+
+			if (signedDistance < -radius)
+			{
+				numFullyInside++;
+			}
+			else if (signedDistance > radius)
+			{
+				// Fully outside any plane means we are fully outside, and can early out
+				return 1;
+			}
+		}
+
+		// Fully outside?
+		if (numFullyInside == numPlanes)
+		{
+			return -1;
+		}
+		
+		return 0;
+	}
 
 	template<int MAX_VERTICES = 8>
 	inline int CountVerticesInsideHull(const ConvexHullView& hull, const ConstMemoryView<math::Float4>& vertexList)
@@ -856,6 +879,11 @@ namespace bvh
 			return min.Add(max).Mul(math::HALF);
 		}
 
+		math::Float4 ComputeHalfExtents() const
+		{
+			return min.Sub(max).Mul(math::HALF);
+		}
+
 		// Precompute convex hull optimized storage
 		AABBConvexHullStorage ComputeConvexHullStorage() const
 		{
@@ -887,10 +915,12 @@ namespace bvh
 		virtual void DrawBounds(const AABB& bounds, const AABB& parentBounds, int nodeId, int depth, bool isLeaf, bool isTrueBounds) const = 0;
 	};
 
-	template<typename UserDataType = uintptr_t, typename IndexType = unsigned short>
+	template<typename UserDataType = uintptr_t>
 	class BVH3D
 	{
 	public:
+		typedef unsigned int IndexType;
+
 		static_assert(std::is_integral<IndexType>::value, "Index type must be an integer");
 		static_assert(std::is_unsigned<IndexType>::value, "Index type must be signed");
 
@@ -907,10 +937,12 @@ namespace bvh
 			int failedSATIntersections = 0;
 			int successfulSATIntersections = 0;
 			int numVIHTests = 0;
+			int numHSITests = 0;
 			int separatingAxisTheoremSkipped = 0;
 			int intersectionsBypassed = 0;
 			int totalNodesVisited = 0;
 
+			double totalHSITime = 0;
 			double totalVIHTime = 0;
 			double totalSATTime = 0;
 
@@ -931,6 +963,8 @@ namespace bvh
 			IndexType child1;
 			IndexType handleIndex;
 			AABB bounds;
+
+			// Cached precomputed state
 			float cost;
 
 			bool isLeaf() const
@@ -1212,15 +1246,7 @@ namespace bvh
 		{
 			if (stats)
 			{
-				stats->leafCount = 0;
-				stats->failedSATIntersections = 0;
-				stats->successfulSATIntersections = 0;
-				stats->separatingAxisTheoremSkipped = 0;
-				stats->numVIHTests = 0;
-				stats->intersectionsBypassed = 0;
-				stats->totalNodesVisited = 0;
-				stats->totalSATTime = 0;
-				stats->totalVIHTime = 0;
+				*stats = {};
 			}
 
 			ConvexHullQueryNode(hull, mRootIndex, callback, user, stats, false);
@@ -1271,6 +1297,18 @@ namespace bvh
 			mFreeHandles.push_back(handle);
 		}
 
+		void PrecomputeNodeData(Node& node)
+		{
+			node.cost = node.bounds.ComputeCostHeuristic();
+
+			math::Float4 center = node.bounds.ComputeCenter();
+
+
+
+
+
+		}
+
 		IndexType AllocateNode(const AABB& bounds)
 		{
 			IndexType index = INVALID_INDEX_VALUE;
@@ -1306,7 +1344,7 @@ The BVH will continue to operate normally until the limit is reached");
 			node.isDead = false;
 #endif
 			node.bounds = bounds;
-			node.cost = bounds.ComputeCostHeuristic();
+			PrecomputeNodeData(node);
 
 			return index;
 		}
@@ -1353,53 +1391,7 @@ The BVH will continue to operate normally until the limit is reached");
 				float inheritedCost;
 			};
 
-#if 0
-			std::queue<Helper> priorityQueue;
-			priorityQueue.push({ mRootIndex, 0.0f });
-
-			while (!priorityQueue.empty())
-			{
-				const auto& entry = priorityQueue.front();
-
-				IndexType nodeIndex = entry.node;
-				float inheritedCost = entry.inheritedCost;
-				float directCost = ComputeDirectCost(bounds, nodeIndex);
-
-				priorityQueue.pop();
-
-				float cost = inheritedCost + directCost;
-
-				if (cost < bestCost)
-				{
-					bestNode = nodeIndex;
-					bestCost = cost;
-				}
-
-				if (!mNodes[nodeIndex].isLeaf())
-				{
-					float costDelta = ComputeCostDelta(bounds, nodeIndex);
-					float lowerBoundChildCost = inheritedCost + costDelta + boundsCost;
-					if (lowerBoundChildCost < bestCost)
-					{
-						priorityQueue.push({ mNodes[nodeIndex].child0, inheritedCost + costDelta });
-						priorityQueue.push({ mNodes[nodeIndex].child1, inheritedCost + costDelta });
-
-
-						volatile static int maxQueueSize = 0;
-						if (priorityQueue.size() > maxQueueSize)
-						{
-							maxQueueSize = priorityQueue.size();
-
-							char buffer[64];
-							snprintf(buffer, sizeof(buffer), "%i\n", maxQueueSize);
-							OutputDebugStringA(buffer);
-						}
-					}
-				}
-			}
-#endif
-
-			static const int MAX_HELPER_STACK_SIZE = 512;
+			static const int MAX_HELPER_STACK_SIZE = 128;
 			Helper helperStack[MAX_HELPER_STACK_SIZE];
 			int helperCount = 0;
 
@@ -1537,7 +1529,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 				// Refit the original parent
 				mNodes[parentIndex].bounds = tmpBounds;
-				mNodes[parentIndex].cost = costB;
+				PrecomputeNodeData(mNodes[parentIndex]);
 
 				Validate();
 			}
@@ -1617,7 +1609,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 					AABB combinedChildBounds = mNodes[c0].bounds.ComputeMerged(mNodes[c1].bounds);
 					mNodes[tmp].bounds = combinedChildBounds;
-					mNodes[tmp].cost = combinedChildBounds.ComputeCostHeuristic();
+					PrecomputeNodeData(mNodes[tmp]);
 
 					Rotate(tmp);
 					Validate();
@@ -1697,7 +1689,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 				AABB combinedChildBounds = mNodes[c0].bounds.ComputeMerged(mNodes[c1].bounds);
 				mNodes[tmp].bounds = combinedChildBounds;
-				mNodes[tmp].cost = combinedChildBounds.ComputeCostHeuristic();
+				PrecomputeNodeData(mNodes[tmp]);
 
 				tmp = mNodes[tmp].parent;
 			}
@@ -1725,7 +1717,7 @@ The BVH will continue to operate normally until the limit is reached");
 
 			if (isLeaf)
 			{
-				callbacks->DrawBounds(mHandles[mNodes[currentNode].handleIndex].originalBounds, mHandles[mNodes[currentNode].handleIndex].originalBounds,
+				callbacks->DrawBounds(mNodes[currentNode].bounds, mNodes[currentNode].bounds,
 					currentNode, depth, false, true);
 			}
 
@@ -1753,6 +1745,42 @@ The BVH will continue to operate normally until the limit is reached");
 			}
 
 			bool fullyInside = false;
+
+			// Perform a very broad approximation of our intersection test by computing a bounding sphere and testing it against our hull
+			// This is the simplest form of intersection we can do, it allows us to reject future tests if its fully outside or fully inside
+			// And then we only need to perform the high accuracy tests in the event that it intersects with the hull
+			if (!intersects)
+			{
+				if (stats)
+				{
+					stats->numHSITests++;
+				}
+
+				math::Float4 center = node.bounds.ComputeCenter();
+				math::Float4 halfExtents = node.bounds.ComputeHalfExtents();
+				float radius = sqrt(halfExtents.Dot3(halfExtents));
+
+				Timer timer;
+				int r = HullSphereIntersection(hull, center, radius);
+				if (stats)
+				{
+					stats->totalHSITime += timer.getMicroseconds();
+				}
+
+				if (r > 0)
+				{
+					// Fully outside, If the sphere is fully outside, then we know no other test will pass
+					return;
+				}
+				else if (r < 0)
+				{
+					// Fully inside, If the sphere is fully inside, can bypass all future checks
+					intersects = true;
+					fullyInside = true;
+				}
+			}
+
+#if 0
 			if (!intersects)
 			{
 				if (stats)
@@ -1794,7 +1822,8 @@ The BVH will continue to operate normally until the limit is reached");
 					stats->intersectionsBypassed++;
 				}
 			}
-			
+#endif
+
 			if (!intersects)
 			{
 				Timer timer;
@@ -1829,7 +1858,7 @@ The BVH will continue to operate normally until the limit is reached");
 					}
 
 					// Leaf
-					callback(mHandles[node.handleIndex].userData, node.bounds, user);
+					callback(mHandles[node.handleIndex].userData, mHandles[node.handleIndex].originalBounds, user);
 				}
 				else
 				{
