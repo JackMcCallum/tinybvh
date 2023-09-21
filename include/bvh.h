@@ -11,7 +11,10 @@ Orthographic queries
 #include <array>
 #include <algorithm>
 #include <queue>
+
 #include <xmmintrin.h>
+#include <emmintrin.h>
+#include <smmintrin.h>
 
 #ifndef BVH_ASSERT
 #define BVH_ASSERT(cond) do { if (!(cond)) { printf("ASSERT FAILED: %s", #cond); __debugbreak(); } } while (false)
@@ -31,8 +34,16 @@ Orthographic queries
 
 #define BVH_FORCEINLINE __forceinline
 
+#pragma push_macro("min")
+#pragma push_macro("max")
+
+#ifdef min
 #undef min
+#endif
+
+#ifdef max
 #undef max
+#endif
 
 namespace math
 {
@@ -2061,6 +2072,7 @@ The BVH will continue to operate normally until the limit is reached");
 		std::vector<Handle> mFreeHandles;
 
 	};
-
-
 }
+
+#pragma pop_macro("min")
+#pragma pop_macro("max")
