@@ -16,6 +16,8 @@ Orthographic queries
 #include <emmintrin.h>
 #include <smmintrin.h>
 
+#include "bvhforward.h"
+
 #ifndef BVH_ASSERT
 #define BVH_ASSERT(cond) do { if (!(cond)) { printf("ASSERT FAILED: %s", #cond); __debugbreak(); } } while (false)
 #endif
@@ -255,11 +257,6 @@ namespace math
 
 namespace bvh
 {
-	struct Handle
-	{
-		int id = -1;
-	};
-
 	class Timer
 	{
 	public:
@@ -384,8 +381,6 @@ namespace bvh
 		// limits have been checked, therefore safe to cast
 		return static_cast<Dst>(value);
 	}
-
-	static const Handle INVALID_HANDLE = { -1 };
 
 	template<typename T>
 	class MemoryView
@@ -1083,10 +1078,12 @@ namespace bvh
 		{
 			// Unlink the handle from the node
 			mNodes[mHandles[handle.id].node].handleIndex = INVALID_INDEX_VALUE;
-			mHandles[handle.id].node = INVALID_INDEX_VALUE;
 
+         // Release the node
 			RemoveFromBVH(mHandles[handle.id].node);
-			ReleaseHandle(handle);
+         mHandles[handle.id].node = INVALID_INDEX_VALUE;
+
+         ReleaseHandle(handle);
 		}
 
 		// Access the bounding volume of a leaf
@@ -1098,13 +1095,13 @@ namespace bvh
 		// Access the user data of a leaf
 		UserDataType& GetUserData(Handle handle)
 		{
-			return mNodes[handle.id].userData;
+			return mHandles[handle.id].userData;
 		}
 
 		// Access the user data a leaf
 		const UserDataType& GetUserData(Handle handle) const
 		{
-			return mNodes[handle.id].userData;
+			return mHandles[handle.id].userData;
 		}
 
 
